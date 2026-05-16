@@ -95,14 +95,7 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
     setTransFormData({ type: 'expense', amount: '', category: '', description: '', pricePerLiter: '', liters: '', date: today });
   };
 
-  const handleLoanSubmit = (e) => {
-    e.preventDefault();
-    if (editingLoanId) onUpdateLoan(editingLoanId, loanFormData);
-    else onAddLoan(loanFormData);
-    setShowLoanModal(false);
-    setEditingLoanId(null);
-    setLoanFormData({ name: '', principal: '', interest: '', dueDate: today, type: 'fixed' });
-  };
+
 
   const openEditTrans = (t) => {
     setEditingTransId(t.id);
@@ -120,6 +113,18 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
     setPaymentModal({ planned: p, payAmount: String(p.amount) });
   };
 
+  const handleLoanSubmit = (e) => {
+    e.preventDefault();
+    if (editingLoanId) {
+      onUpdateLoan(editingLoanId, loanFormData);
+    } else {
+      onAddLoan(loanFormData);
+    }
+    setShowLoanModal(false);
+    setEditingLoanId(null);
+    setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
+  };
+
   const handlePaymentSubmit = (e) => {
     e.preventDefault();
     if (!paymentModal) return;
@@ -129,7 +134,7 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
     if (paidAmt <= 0) return;
     // Always log the expense transaction
     onAddTransaction({
-      type: 'expense',
+      type: planned.type || 'expense',
       amount: paidAmt,
       category: planned.category || 'Bills',
       description: `${paidAmt < fullAmt ? 'Partial payment' : 'Payment'}: ${planned.name}`,
@@ -325,6 +330,36 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
               <div className="form-group"><label className="form-label"><AlignLeft size={12} style={{ marginRight: '4px' }} /> Description</label><input type="text" className="form-control" placeholder="Note..." value={transFormData.description} onChange={e => setTransFormData({...transFormData, description: e.target.value})} /></div>
               <div className="form-group"><label className="form-label">Date</label><input type="date" className="form-control" value={transFormData.date} onChange={e => setTransFormData({...transFormData, date: e.target.value})} required /></div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>{editingTransId ? 'Update' : 'Save'}</button></form></div></div>
+      )}
+
+      {/* Loan Modal */}
+      {showLoanModal && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content animate-fade-in" style={{ maxWidth: '440px' }}>
+            <div className="flex-between mb-lg">
+              <h3>{editingLoanId ? 'Edit Loan' : 'Add New Loan'}</h3>
+              <button className="btn-ghost" onClick={() => { setShowLoanModal(false); setEditingLoanId(null); setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' }); }}><X size={20}/></button>
+            </div>
+            <form onSubmit={handleLoanSubmit}>
+              <div className="form-group">
+                <label className="form-label">Loan Type</label>
+                <div className="type-toggle-group">
+                  <label className={`type-toggle-btn ${loanFormData.type === 'fixed' ? 'active expense' : ''}`}>
+                    <input type="radio" checked={loanFormData.type === 'fixed'} onChange={() => setLoanFormData({...loanFormData, type: 'fixed'})} /> Fixed
+                  </label>
+                  <label className={`type-toggle-btn ${loanFormData.type === 'flexible' ? 'active income' : ''}`}>
+                    <input type="radio" checked={loanFormData.type === 'flexible'} onChange={() => setLoanFormData({...loanFormData, type: 'flexible'})} /> Gold / Flex
+                  </label>
+                </div>
+              </div>
+              <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-control" placeholder="e.g. Personal Loan" value={loanFormData.name} onChange={e => setLoanFormData({...loanFormData, name: e.target.value})} required /></div>
+              <div className="form-group"><label className="form-label">Principal Amount (Rs.)</label><input type="number" className="form-control" placeholder="0" value={loanFormData.principal} onChange={e => setLoanFormData({...loanFormData, principal: e.target.value})} required /></div>
+              <div className="form-group"><label className="form-label">Interest Rate (%)</label><input type="number" step="0.1" className="form-control" placeholder="0.0" value={loanFormData.interest} onChange={e => setLoanFormData({...loanFormData, interest: e.target.value})} required /></div>
+              <div className="form-group"><label className="form-label">Due/Review Date</label><input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} /></div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>{editingLoanId ? 'Update Details' : 'Add Loan'}</button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
