@@ -56,6 +56,48 @@ function App() {
   useEffect(() => db.savePlannedPayments(plannedPayments), [plannedPayments]);
   useEffect(() => db.saveAccounts(accounts), [accounts]);
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger shortcuts if user is typing in an input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        if (e.key === 'Escape') {
+          // Allow Escape to close modals even if focused on an input
+          setShowAddLoanModal(false);
+          setEditingLoan(null);
+        }
+        return;
+      }
+
+      // Tab Navigation (1-7)
+      if (e.key === '1') setActiveTab('dashboard');
+      if (e.key === '2') setActiveTab('accounts');
+      if (e.key === '3') setActiveTab('insights');
+      if (e.key === '4') setActiveTab('planner');
+      if (e.key === '5') setActiveTab('transactions');
+      if (e.key === '6') setActiveTab('loans');
+      if (e.key === '7') setActiveTab('settings');
+
+      // Quick Actions
+      if (e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setActiveTab('dashboard');
+        // We'll need a way to trigger the modal in Dashboard.jsx 
+        // For now, just switching to the right tab is a good start
+        // Or we can use a custom event
+        window.dispatchEvent(new CustomEvent('open-transaction-modal'));
+      }
+      
+      if (e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        setShowAddLoanModal(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const filteredTransactions = useMemo(() => {
     if (filterType === 'all') return transactions;
     if (filterType === 'year') {
@@ -275,6 +317,7 @@ function App() {
               onDeleteLoan={deleteLoan}
               onUpdateLoan={updateLoan}
               onMarkPaidPlanned={markAsPaid}
+              onUpdatePlanned={updatePlannedPayment}
               onSwitchTab={setActiveTab}
               viewMode={filterType}
             />
@@ -291,7 +334,17 @@ function App() {
           )}
 
           {activeTab === 'insights' && <Insights transactions={transactions} />}
-          {activeTab === 'planner' && <Planner plannedPayments={plannedPayments} onAddPlanned={addPlannedPayment} onUpdatePlanned={updatePlannedPayment} onMarkPaid={markAsPaid} onDeletePlanned={deletePlannedPayment} />}
+          {activeTab === 'planner' && (
+            <Planner 
+              plannedPayments={plannedPayments} 
+              accounts={accounts}
+              onAddPlanned={addPlannedPayment} 
+              onUpdatePlanned={updatePlannedPayment} 
+              onMarkPaid={markAsPaid} 
+              onDeletePlanned={deletePlannedPayment}
+              onAddTransaction={addTransaction}
+            />
+          )}
           
           {activeTab === 'transactions' && (
             <div className="animate-fade-in">

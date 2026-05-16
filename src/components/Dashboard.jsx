@@ -3,7 +3,7 @@ import { TrendingUp, Plus, X, CreditCard, ArrowUpRight, ArrowDownLeft, Tag, Alig
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import './Dashboard.css';
 
-const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments = [], accounts = [], onAddTransaction, onDeleteTransaction, onUpdateTransaction, onAddLoan, onDeleteLoan, onUpdateLoan, onMarkPaidPlanned, onSwitchTab, viewMode }) => {
+const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments = [], accounts = [], onAddTransaction, onDeleteTransaction, onUpdateTransaction, onAddLoan, onDeleteLoan, onUpdateLoan, onMarkPaidPlanned, onUpdatePlanned, onSwitchTab, viewMode }) => {
   const [showTransModal, setShowTransModal] = useState(false);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [editingTransId, setEditingTransId] = useState(null);
@@ -81,6 +81,12 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
     }
   }, [transFormData.amount, transFormData.pricePerLiter, transFormData.category]);
 
+  useEffect(() => {
+    const handleOpenModal = () => setShowTransModal(true);
+    window.addEventListener('open-transaction-modal', handleOpenModal);
+    return () => window.removeEventListener('open-transaction-modal', handleOpenModal);
+  }, []);
+
   const balance = transactions.reduce((sum, t) => sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount)), 0);
   const remainingLoanBalance = loans.reduce((sum, l) => sum + (Number(l.principal) - Number(l.paid)), 0);
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -144,6 +150,14 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
     // Only mark as fully paid if full amount (or more) is paid
     if (paidAmt >= fullAmt) {
       onMarkPaidPlanned(planned, true); // pass true = skip transaction logging (already done)
+    } else {
+      // Partial payment - update the original obligation with the remaining amount
+      // and preserve the original total for display
+      onUpdatePlanned(planned.id, { 
+        ...planned, 
+        amount: fullAmt - paidAmt,
+        originalAmount: planned.originalAmount || fullAmt
+      });
     }
     setPaymentModal(null);
   };

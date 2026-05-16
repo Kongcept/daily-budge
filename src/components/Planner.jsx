@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, Check, X, Clock, AlertTriangle, Trash2, Edit2 } from 'lucide-react';
+import { Calendar, Plus, Check, X, Clock, AlertTriangle, Trash2, Edit2, DollarSign, Landmark } from 'lucide-react';
 
-const Planner = ({ plannedPayments, onAddPlanned, onUpdatePlanned, onMarkPaid, onDeletePlanned }) => {
+const Planner = ({ plannedPayments, accounts = [], onAddPlanned, onUpdatePlanned, onMarkPaid, onDeletePlanned, onAddTransaction }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [paymentModal, setPaymentModal] = useState(null); // { planned, payAmount, accountId }
+  
   const getTodayDate = () => new Date().toISOString().split('T')[0];
+  const today = getTodayDate();
   
   const [formData, setFormData] = useState({
     name: '', amount: '', dueDate: getTodayDate(), category: 'Education', type: 'expense'
@@ -22,10 +25,45 @@ const Planner = ({ plannedPayments, onAddPlanned, onUpdatePlanned, onMarkPaid, o
     closeModal();
   };
 
+  const handlePaymentSubmit = (e) => {
+    e.preventDefault();
+    if (!paymentModal) return;
+    const { planned, payAmount, accountId } = paymentModal;
+    const paidAmt = Number(payAmount);
+    const fullAmt = Number(planned.amount);
+    if (paidAmt <= 0) return;
+
+    onAddTransaction({
+      type: planned.type || 'expense',
+      amount: paidAmt,
+      category: planned.category || 'Bills',
+      description: `${paidAmt < fullAmt ? 'Partial payment' : 'Payment'}: ${planned.name}`,
+      date: today,
+      accountId: accountId
+    });
+
+    if (paidAmt >= fullAmt) {
+      onMarkPaid(planned, true); // true = skip duplicate transaction logging
+    } else {
+      // Partial payment - update the original obligation with the remaining amount
+      // and preserve the original total for display
+      onUpdatePlanned(planned.id, { 
+        ...planned, 
+        amount: fullAmt - paidAmt,
+        originalAmount: planned.originalAmount || fullAmt
+      });
+    }
+    setPaymentModal(null);
+  };
+
   const openEdit = (p) => {
     setEditingId(p.id);
     setFormData({ name: p.name, amount: p.amount, dueDate: p.dueDate, category: p.category, type: p.type || 'expense' });
     setShowModal(true);
+  };
+
+  const openPaymentModal = (p) => {
+    setPaymentModal({ planned: p, payAmount: String(p.amount), accountId: 'cash' });
   };
 
   const closeModal = () => {
@@ -93,7 +131,7 @@ const Planner = ({ plannedPayments, onAddPlanned, onUpdatePlanned, onMarkPaid, o
                   <td>
                     <div className={`badge ${isOverdue ? 'badge-danger' : isUrgent ? 'badge-gold' : 'badge-teal'}`} 
                          style={{ width: '100%', minWidth: '120px' }}>
-                      {isOverdue ? `${Math.abs(daysLeft)}D OVERDUE` : `${daysLeft}D REMAINING`}
+                       {isOverdue ? `${Math.abs(daysLeft)}D OVERDUE` : `${daysLeft}D REMAINING`}
                     </div>
                   </td>
                   <td style={{ fontWeight: '700', color: 'var(--slate-medium)' }}>{p.dueDate}</td>
@@ -103,11 +141,16 @@ const Planner = ({ plannedPayments, onAddPlanned, onUpdatePlanned, onMarkPaid, o
                   </td>
                   <td><span className="badge badge-violet">{p.category}</span></td>
                   <td style={{ textAlign: 'right', fontWeight: '800', color: p.type === 'income' ? 'var(--accent-success)' : 'var(--slate-dark)', fontSize: '1rem' }}>
-                    {p.type === 'income' ? '+' : ''}Rs.{Number(p.amount).toLocaleString()}
+                    <div style={{ lineHeight: '1' }}>{p.type === 'income' ? '+' : ''}Rs.{Number(p.amount).toLocaleString()}</div>
+                    {p.originalAmount && (
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: '600', marginTop: '4px', opacity: 0.8 }}>
+                         Total: Rs.{Number(p.originalAmount).toLocaleString()}
+                      </div>
+                    )}
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <div className="item-actions-wrapper">
-                      <button className="btn btn-success" style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => onMarkPaid(p)}>
+                      <button className="btn btn-success" style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: '8px' }} onClick={() => openPaymentModal(p)}>
                         <Check size={14} /> {p.type === 'income' ? 'Received' : 'Paid'}
                       </button>
                       <div className="table-divider"></div>
@@ -127,6 +170,7 @@ const Planner = ({ plannedPayments, onAddPlanned, onUpdatePlanned, onMarkPaid, o
         {plannedPayments.length === 0 && <div style={{ padding: '60px', textAlign: 'center' }} className="text-secondary">No planned payments.</div>}
       </div>
 
+      {/* Main Plan Modal */}
       {showModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }}>
           <div className="modal-content animate-fade-in">
@@ -169,6 +213,50 @@ const Planner = ({ plannedPayments, onAddPlanned, onUpdatePlanned, onMarkPaid, o
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>
                 {editingId ? 'Update Schedule' : 'Schedule Payment'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Pay Obligation Modal */}
+      {paymentModal && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content animate-fade-in" style={{ maxWidth: '400px' }}>
+            <div className="flex-between mb-lg">
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>Confirm {paymentModal.planned.type === 'income' ? 'Income' : 'Payment'}</h3>
+                <p className="text-secondary" style={{ fontSize: '0.8rem' }}>{paymentModal.planned.name}</p>
+              </div>
+              <button className="btn-ghost" onClick={() => setPaymentModal(null)}><X size={20}/></button>
+            </div>
+
+            <form onSubmit={handlePaymentSubmit}>
+              <div className="form-group">
+                <label className="form-label">Target Account</label>
+                <div className="category-chips">
+                  {accounts.map(acc => (
+                    <button key={acc.id} type="button" className={`chip ${paymentModal.accountId === acc.id ? 'active' : ''}`} onClick={() => setPaymentModal({...paymentModal, accountId: acc.id})}>
+                      {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '4px' }} /> : <Landmark size={12} style={{ marginRight: '4px' }} />}
+                      {acc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Amount (Rs.)</label>
+                <input type="number" className="form-control" style={{ fontSize: '1.1rem', fontWeight: '700', textAlign: 'center' }} value={paymentModal.payAmount} onChange={e => setPaymentModal({ ...paymentModal, payAmount: e.target.value })} required autoFocus />
+                {Number(paymentModal.payAmount) < Number(paymentModal.planned.amount) && Number(paymentModal.payAmount) > 0 && (
+                  <p style={{ fontSize: '0.72rem', color: 'var(--accent-danger)', marginTop: '6px', fontWeight: '600' }}>
+                    ⚠ Partial — remains in planner.
+                  </p>
+                )}
+              </div>
+              <div className="flex-center gap-md" style={{ marginTop: '16px' }}>
+                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setPaymentModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-success" style={{ flex: 2 }}>
+                  <Check size={16} /> Confirm
+                </button>
+              </div>
             </form>
           </div>
         </div>

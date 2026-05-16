@@ -13,13 +13,13 @@ import {
 
 const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'accounts', label: 'Bank Accounts', icon: Wallet },
-    { id: 'insights', label: 'Analysis & Compare', icon: PieChart },
-    { id: 'planner', label: 'Future Planner', icon: CalendarClock },
-    { id: 'transactions', label: 'Cash Flow', icon: History },
-    { id: 'loans', label: 'Loan Tracker', icon: Wallet },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, key: '1' },
+    { id: 'accounts', label: 'Bank Accounts', icon: Wallet, key: '2' },
+    { id: 'insights', label: 'Analysis & Compare', icon: PieChart, key: '3' },
+    { id: 'planner', label: 'Future Planner', icon: CalendarClock, key: '4' },
+    { id: 'transactions', label: 'Cash Flow', icon: History, key: '5' },
+    { id: 'loans', label: 'Loan Tracker', icon: Wallet, key: '6' },
+    { id: 'settings', label: 'Settings', icon: Settings, key: '7' },
   ];
 
   return (
@@ -48,7 +48,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
             key={item.id}
             className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
             onClick={() => setActiveTab(item.id)}
-            title={isCollapsed ? item.label : ""}
+            data-tooltip={isCollapsed ? `${item.label} (${item.key})` : ""}
           >
             <item.icon size={20} className="nav-icon" />
             {!isCollapsed && <span className="nav-label">{item.label}</span>}
