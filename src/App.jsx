@@ -1,0 +1,364 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import Insights from './components/Insights';
+import Planner from './components/Planner';
+import { db } from './db';
+import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock } from 'lucide-react';
+import './App.css';
+
+function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [notification, setNotification] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Collapsed by default
+  
+  const getTodayDate = () => new Date().toISOString().split('T')[0];
+  const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
+
+  // Core Data
+  const [transactions, setTransactions] = useState(() => db.getTransactions());
+  const [loans, setLoans] = useState(() => db.getLoans());
+  const [plannedPayments, setPlannedPayments] = useState(() => db.getPlannedPayments());
+
+  // Filters
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
+  const [filterType, setFilterType] = useState('month'); 
+
+  // Loan Modal States
+  const [showAddLoanModal, setShowAddLoanModal] = useState(false);
+  const [editingLoan, setEditingLoan] = useState(null);
+  const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
+
+  useEffect(() => { db.saveTransactions(transactions); }, [transactions]);
+  useEffect(() => { db.saveLoans(loans); }, [loans]);
+  useEffect(() => { db.savePlannedPayments(plannedPayments); }, [plannedPayments]);
+
+  const filteredTransactions = useMemo(() => {
+    if (filterType === 'all') return transactions;
+    if (filterType === 'year') {
+      const year = selectedMonth.split('-')[0];
+      return transactions.filter(t => t.date.startsWith(year));
+    }
+    return transactions.filter(t => t.date.startsWith(selectedMonth));
+  }, [transactions, selectedMonth, filterType]);
+
+  const triggerNotification = (message) => {
+    setNotification(message);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const getDaysRemaining = (date) => {
+    if (!date) return null;
+    const diff = new Date(date) - new Date();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  // Handlers
+  const addTransaction = (transaction) => {
+    setTransactions([...transactions, { ...transaction, id: Date.now() }]);
+    triggerNotification('Entry added successfully!');
+  };
+
+  const deleteTransaction = (id) => {
+    setTransactions(transactions.filter(t => t.id !== id));
+    triggerNotification('Entry deleted.');
+  };
+
+  const updateTransaction = (id, updatedData) => {
+    setTransactions(transactions.map(t => t.id === id ? { ...t, ...updatedData } : t));
+    triggerNotification('Successfully updated!');
+  };
+
+  const addPlannedPayment = (data) => {
+    setPlannedPayments([...plannedPayments, { ...data, id: Date.now() }]);
+    triggerNotification('Payment scheduled!');
+  };
+
+  const updatePlannedPayment = (id, updatedData) => {
+    setPlannedPayments(plannedPayments.map(p => p.id === id ? { ...p, ...updatedData } : p));
+    triggerNotification('Schedule updated!');
+  };
+
+  const deletePlannedPayment = (id) => {
+    setPlannedPayments(plannedPayments.filter(p => p.id !== id));
+    triggerNotification('Schedule removed.');
+  };
+
+  const markAsPaid = (planned, skipTransaction = false) => {
+    if (!skipTransaction) {
+      addTransaction({
+        type: planned.type || 'expense', 
+        amount: planned.amount, 
+        category: planned.category,
+        description: `Planned ${planned.type === 'income' ? 'income' : 'payment'}: ${planned.name}`, 
+        date: getTodayDate()
+      });
+    }
+    deletePlannedPayment(planned.id);
+    triggerNotification(`${planned.type === 'income' ? 'Received' : 'Paid'}: ${planned.name}`);
+  };
+
+  const addLoan = (loan) => {
+    setLoans([...loans, { ...loan, id: Date.now(), paid: Number(loan.paid || 0), type: loan.type || 'fixed' }]);
+    triggerNotification('Loan added successfully!');
+    setShowAddLoanModal(false);
+    resetLoanForm();
+  };
+
+  const deleteLoan = (id) => {
+    setLoans(loans.filter(l => l.id !== id));
+    triggerNotification('Loan deleted.');
+  };
+
+  const updateLoan = (id, updatedData) => {
+    setLoans(loans.map(l => l.id === id ? { ...l, ...updatedData } : l));
+    triggerNotification('Loan details updated!');
+  };
+
+  const resetLoanForm = () => {
+    setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
+    setEditingLoan(null);
+  };
+
+  const recordLoanPayment = (loanId, amount, isInterestOnly = false) => {
+    const loan = loans.find(l => l.id === loanId);
+    if (!loan) return;
+    updateLoan(loanId, { paid: Number(loan.paid) + (isInterestOnly ? 0 : Number(amount)) });
+    addTransaction({
+      type: 'expense', amount: amount, category: isInterestOnly ? 'Loan Interest' : 'Loan Payment',
+      description: `${isInterestOnly ? 'Interest payment' : 'Principal payment'} for ${loan.name}`, date: getTodayDate()
+    });
+    triggerNotification(`${isInterestOnly ? 'Interest' : 'Principal'} payment recorded!`);
+  };
+
+  const openEditLoan = (loan) => {
+    setEditingLoan(loan);
+    setLoanFormData({ name: loan.name, principal: loan.principal, interest: loan.interest, dueDate: loan.dueDate, type: loan.type || 'fixed' });
+  };
+
+  const handleLoanSubmit = (e) => {
+    e.preventDefault();
+    if (editingLoan) updateLoan(editingLoan.id, loanFormData);
+    else addLoan(loanFormData);
+    resetLoanForm();
+  };
+
+  return (
+    <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isCollapsed={isSidebarCollapsed} 
+        setIsCollapsed={setIsSidebarCollapsed} 
+      />
+      <main className="main-content">
+        <div className="page-container">
+          
+          {notification && (
+            <div className={`page-notification show`}>
+               <CheckCircle size={16} />
+               {notification}
+            </div>
+          )}
+
+          {activeTab !== 'insights' && activeTab !== 'planner' && activeTab !== 'settings' && (
+            <div className="filter-bar mb-lg glass-panel">
+              <div className="flex-center gap-md">
+                <div className="flex-center gap-sm">
+                  <Calendar size={16} className="text-gold" />
+                  <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--slate-medium)', whiteSpace: 'nowrap' }}>FILTER VIEW:</span>
+                </div>
+                <div className="filter-options flex-center gap-xs">
+                   <button className={`filter-btn ${filterType === 'month' ? 'active' : ''}`} onClick={() => setFilterType('month')}>Monthly</button>
+                   <button className={`filter-btn ${filterType === 'year' ? 'active' : ''}`} onClick={() => setFilterType('year')}>Yearly</button>
+                   <button className={`filter-btn ${filterType === 'all' ? 'active' : ''}`} onClick={() => setFilterType('all')}>All Time</button>
+                </div>
+                {filterType !== 'all' && (
+                  <div className="date-input-wrapper">
+                    <input 
+                      type={filterType === 'month' ? "month" : "number"} 
+                      className="form-control date-filter-input" 
+                      value={filterType === 'month' ? selectedMonth : selectedMonth.split('-')[0]}
+                      onChange={(e) => {
+                        if (filterType === 'month') setSelectedMonth(e.target.value);
+                        else setSelectedMonth(`${e.target.value}-01`);
+                      }}
+                      min="2020" max="2030" placeholder="YYYY"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="text-secondary" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                 Showing <span className="text-gold" style={{ fontWeight: '800' }}>{filteredTransactions.length}</span> records
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'dashboard' && (
+            <Dashboard 
+              transactions={filteredTransactions} 
+              allTransactions={transactions}
+              loans={loans}
+              plannedPayments={plannedPayments}
+              onAddTransaction={addTransaction} 
+              onDeleteTransaction={deleteTransaction}
+              onUpdateTransaction={updateTransaction}
+              onAddLoan={addLoan}
+              onDeleteLoan={deleteLoan}
+              onUpdateLoan={updateLoan}
+              onMarkPaidPlanned={markAsPaid}
+              onSwitchTab={setActiveTab}
+              viewMode={filterType}
+            />
+          )}
+
+          {activeTab === 'insights' && <Insights transactions={transactions} />}
+          {activeTab === 'planner' && <Planner plannedPayments={plannedPayments} onAddPlanned={addPlannedPayment} onUpdatePlanned={updatePlannedPayment} onMarkPaid={markAsPaid} onDeletePlanned={deletePlannedPayment} />}
+          
+          {activeTab === 'transactions' && (
+            <div className="animate-fade-in">
+              <h2 className="section-title">Cash Flow</h2>
+              <p className="section-subtitle">Detailed history of all your income and expenses.</p>
+              <div className="cashflow-table-container">
+                 <table className="cashflow-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Details</th>
+                        <th>Type</th>
+                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTransactions.slice().reverse().map(t => (
+                        <tr key={t.id}>
+                          <td>{t.date}</td>
+                          <td style={{ fontWeight: '600' }}>{t.category}{t.liters && <span className="badge badge-gold" style={{ marginLeft: '8px' }}>{t.liters}L</span>}</td>
+                          <td className="text-secondary" style={{ fontSize: '0.85rem' }}>{t.description || '-'}{t.pricePerLiter && <span style={{ display: 'block', fontSize: '0.7rem' }}>@ Rs.{t.pricePerLiter}/L</span>}</td>
+                          <td><span className={`badge ${t.type === 'income' ? 'badge-success' : 'badge-danger'}`}>{t.type}</span></td>
+                          <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'income' ? 'var(--accent-success)' : 'var(--accent-danger)' }}>Rs.{Number(t.amount).toLocaleString()}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete this entry?')) deleteTransaction(t.id); }}><Trash2 size={14} /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                 </table>
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'loans' && (
+            <div className="animate-fade-in">
+              <header className="flex-between mb-md" style={{ alignItems: 'flex-end' }}>
+                <div>
+                  <h2 className="section-title">Loan Management</h2>
+                  <p className="section-subtitle" style={{ marginBottom: 0 }}>Detailed overview of all active and flexible loans.</p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowAddLoanModal(true)}><Plus size={16} /> Add New Loan</button>
+              </header>
+              
+              <div className="cashflow-table-container">
+                <table className="cashflow-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '22%' }}>Loan Details</th>
+                      <th style={{ width: '15%' }}>Timeline</th>
+                      <th>Type</th>
+                      <th style={{ textAlign: 'right' }}>Principal</th>
+                      <th style={{ textAlign: 'right' }}>Remaining</th>
+                      <th style={{ textAlign: 'center' }}>Progress</th>
+                      <th style={{ textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loans.map(loan => {
+                      const remaining = loan.principal - loan.paid;
+                      const progress = (loan.paid / loan.principal) * 100;
+                      const isFlexible = loan.type === 'flexible';
+                      const daysLeft = getDaysRemaining(loan.dueDate);
+                      const isOverdue = daysLeft !== null && daysLeft < 0;
+                      return (
+                        <tr key={loan.id}>
+                          <td><div style={{ fontWeight: '700' }}>{loan.name}</div><div className="text-secondary" style={{ fontSize: '0.75rem' }}>Start/Due: {loan.dueDate || 'N/A'}</div></td>
+                          <td>
+                            {loan.dueDate ? (
+                              <div className="flex-center gap-xs" style={{ justifyContent: 'flex-start' }}>
+                                <Clock size={12} className={isOverdue ? 'text-danger' : 'text-gold'} />
+                                <div style={{ fontSize: '0.75rem', fontWeight: '700', color: isOverdue ? 'var(--accent-danger)' : 'var(--slate-dark)' }}>
+                                  {isOverdue ? `${Math.abs(daysLeft)}d Overdue` : `${daysLeft}d Left`}
+                                </div>
+                              </div>
+                            ) : '-'}
+                          </td>
+                          <td><span className={`badge ${isFlexible ? 'badge-gold' : 'badge-violet'}`}>{isFlexible ? 'Flexible' : 'Fixed'}</span><div style={{ fontSize: '0.7rem', marginTop: '2px', opacity: 0.8 }}>{loan.interest}% Interest</div></td>
+                          <td style={{ textAlign: 'right', fontWeight: '500' }}>Rs.{loan.principal.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: 'var(--accent-danger)' }}>Rs.{remaining.toLocaleString()}</td>
+                          <td style={{ textAlign: 'center', width: '100px' }}>
+                            {!isFlexible ? (
+                              <div className="flex-column gap-xs">
+                                <div className="progress-bar-bg" style={{ height: '4px' }}><div className="progress-bar teal" style={{ width: `${progress}%` }}></div></div>
+                                <div style={{ fontSize: '0.65rem', fontWeight: '700' }}>{Math.round(progress)}%</div>
+                              </div>
+                            ) : <RefreshCw size={12} style={{ color: 'var(--gold-primary)' }} />}
+                          </td>
+                          <td>
+                            <div className="flex-center gap-xs">
+                              <div className="record-payment-mini flex-center gap-xs">
+                                <input type="number" className="form-control" style={{ width: '70px', padding: '4px 8px', fontSize: '0.75rem' }} placeholder="Amt..." id={`pay-${loan.id}`} />
+                                <button className="btn btn-success" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => {
+                                    const input = document.getElementById(`pay-${loan.id}`);
+                                    const amount = Number(input.value);
+                                    if(amount > 0) recordLoanPayment(loan.id, amount, false);
+                                    input.value = '';
+                                  }}>Pay</button>
+                                {isFlexible && <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => {
+                                      const input = document.getElementById(`pay-${loan.id}`);
+                                      const amount = Number(input.value);
+                                      if(amount > 0) recordLoanPayment(loan.id, amount, true);
+                                      input.value = '';
+                                    }}>Int</button>}
+                              </div>
+                              <div style={{ borderLeft: '1px solid var(--border-color)', height: '18px', margin: '0 2px' }}></div>
+                              <button className="btn-icon-small" onClick={() => openEditLoan(loan)}><Edit2 size={11}/></button>
+                              <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete loan?')) deleteLoan(loan.id); }}><Trash2 size={11}/></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'settings' && (
+            <div className="animate-fade-in"><h2 className="section-title">Settings</h2><div className="glass-panel" style={{ padding: '24px' }}><button className="btn btn-danger" onClick={() => { if(window.confirm('Clear all data?')) db.resetDatabase(); }}>Reset Database</button></div></div>
+          )}
+        </div>
+      </main>
+
+      {/* Loan Modals unchanged... */}
+      {(showAddLoanModal || editingLoan) && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }}>
+          <div className="modal-content animate-fade-in">
+            <div className="flex-between mb-lg"><h3>{editingLoan ? 'Edit Loan' : 'Add New Loan'}</h3><button className="btn-ghost" onClick={() => { setShowAddLoanModal(false); setEditingLoan(null); resetLoanForm(); }}><X size={20}/></button></div>
+            <form onSubmit={handleLoanSubmit}>
+              <div className="form-group"><label className="form-label">Loan Type</label><div className="type-toggle-group"><label className={`type-toggle-btn ${loanFormData.type === 'fixed' ? 'active income' : ''}`}><input type="radio" checked={loanFormData.type === 'fixed'} onChange={() => setLoanFormData({...loanFormData, type: 'fixed'})} /> Fixed</label><label className={`type-toggle-btn ${loanFormData.type === 'flexible' ? 'active income' : ''}`}><input type="radio" checked={loanFormData.type === 'flexible'} onChange={() => setLoanFormData({...loanFormData, type: 'flexible'})} /> Gold / Flex</label></div></div>
+              <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-control" placeholder="e.g. Personal Loan" value={loanFormData.name} onChange={e => setLoanFormData({...loanFormData, name: e.target.value})} required /></div>
+              <div className="form-group"><label className="form-label">Principal Amount (Rs.)</label><input type="number" className="form-control" placeholder="0" value={loanFormData.principal} onChange={e => setLoanFormData({...loanFormData, principal: e.target.value})} required /></div>
+              <div className="form-group"><label className="form-label">Interest Rate (%)</label><input type="number" step="0.1" className="form-control" placeholder="0.0" value={loanFormData.interest} onChange={e => setLoanFormData({...loanFormData, interest: e.target.value})} required /></div>
+              <div className="form-group"><label className="form-label">Due/Review Date</label><input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} /></div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>{editingLoan ? 'Update Details' : 'Add Loan'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
