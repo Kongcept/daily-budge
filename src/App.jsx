@@ -3,8 +3,9 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Insights from './components/Insights';
 import Planner from './components/Planner';
+import Accounts from './components/Accounts';
 import { db } from './db';
-import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock } from 'lucide-react';
+import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -15,10 +16,18 @@ function App() {
   const getTodayDate = () => new Date().toISOString().split('T')[0];
   const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
+  const getDaysRemaining = (date) => {
+    if (!date) return null;
+    const diff = new Date(date) - new Date();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
   // Core Data
-  const [transactions, setTransactions] = useState(() => db.getTransactions());
-  const [loans, setLoans] = useState(() => db.getLoans());
-  const [plannedPayments, setPlannedPayments] = useState(() => db.getPlannedPayments());
+  const [transactions, setTransactions] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [plannedPayments, setPlannedPayments] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+
 
   // Filters
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
@@ -29,9 +38,23 @@ function App() {
   const [editingLoan, setEditingLoan] = useState(null);
   const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
 
-  useEffect(() => { db.saveTransactions(transactions); }, [transactions]);
-  useEffect(() => { db.saveLoans(loans); }, [loans]);
-  useEffect(() => { db.savePlannedPayments(plannedPayments); }, [plannedPayments]);
+  useEffect(() => {
+    setTransactions(db.getTransactions());
+    setLoans(db.getLoans());
+    setPlannedPayments(db.getPlannedPayments());
+    
+    let storedAccounts = db.getAccounts();
+    if (!storedAccounts || storedAccounts.length === 0) {
+      storedAccounts = [{ id: 'cash', name: 'Cash', balance: 0, type: 'cash' }];
+      db.saveAccounts(storedAccounts);
+    }
+    setAccounts(storedAccounts);
+  }, []);
+
+  useEffect(() => db.saveTransactions(transactions), [transactions]);
+  useEffect(() => db.saveLoans(loans), [loans]);
+  useEffect(() => db.savePlannedPayments(plannedPayments), [plannedPayments]);
+  useEffect(() => db.saveAccounts(accounts), [accounts]);
 
   const filteredTransactions = useMemo(() => {
     if (filterType === 'all') return transactions;
@@ -47,26 +70,70 @@ function App() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const getDaysRemaining = (date) => {
-    if (!date) return null;
-    const diff = new Date(date) - new Date();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  };
+
 
   // Handlers
-  const addTransaction = (transaction) => {
-    setTransactions([...transactions, { ...transaction, id: Date.now() }]);
-    triggerNotification('Entry added successfully!');
+  const addTransaction = (newTrans) => {
+    const transWithId = { ...newTrans, id: Date.now() };
+    setTransactions([...transactions, transWithId]);
+    
+    // Update account balance
+    if (newTrans.accountId) {
+      updateAccountBalance(newTrans.accountId, newTrans.type === 'income' ? Number(newTrans.amount) : -Number(newTrans.amount));
+    }
+    
+    triggerNotification('Transaction recorded!');
   };
 
   const deleteTransaction = (id) => {
+    const trans = transactions.find(t => t.id === id);
+    if (trans && trans.accountId) {
+      // Reverse balance change
+      updateAccountBalance(trans.accountId, trans.type === 'income' ? -Number(trans.amount) : Number(trans.amount));
+    }
     setTransactions(transactions.filter(t => t.id !== id));
     triggerNotification('Entry deleted.');
   };
 
-  const updateTransaction = (id, updatedData) => {
-    setTransactions(transactions.map(t => t.id === id ? { ...t, ...updatedData } : t));
-    triggerNotification('Successfully updated!');
+  const updateTransaction = (id, updatedTrans) => {
+    const oldTrans = transactions.find(t => t.id === id);
+    if (oldTrans && oldTrans.accountId) {
+      // Reverse old balance
+      updateAccountBalance(oldTrans.accountId, oldTrans.type === 'income' ? -Number(oldTrans.amount) : Number(oldTrans.amount));
+    }
+    if (updatedTrans.accountId) {
+      // Apply new balance
+      updateAccountBalance(updatedTrans.accountId, updatedTrans.type === 'income' ? Number(updatedTrans.amount) : -Number(updatedTrans.amount));
+    }
+    setTransactions(transactions.map(t => t.id === id ? { ...t, ...updatedTrans } : t));
+    triggerNotification('Entry updated!');
+  };
+
+  // Account Management Functions
+  const addAccount = (acc) => {
+    setAccounts([...accounts, { ...acc, id: Date.now() }]);
+    triggerNotification('Account added!');
+  };
+
+  const updateAccount = (id, data) => {
+    setAccounts(accounts.map(a => a.id === id ? { ...a, ...data } : a));
+    triggerNotification('Account updated!');
+  };
+
+  const deleteAccount = (id) => {
+    if (id === 'cash') return alert("Cannot delete primary Cash account.");
+    setAccounts(accounts.filter(a => a.id !== id));
+    triggerNotification('Account removed.');
+  };
+
+  const updateAccountBalance = (id, delta) => {
+    setAccounts(prev => prev.map(a => a.id === id ? { ...a, balance: Number(a.balance) + Number(delta) } : a));
+  };
+
+  const transferMoney = (fromId, toId, amount) => {
+    updateAccountBalance(fromId, -amount);
+    updateAccountBalance(toId, amount);
+    triggerNotification('Transfer successful!');
   };
 
   const addPlannedPayment = (data) => {
@@ -200,6 +267,7 @@ function App() {
               allTransactions={transactions}
               loans={loans}
               plannedPayments={plannedPayments}
+              accounts={accounts}
               onAddTransaction={addTransaction} 
               onDeleteTransaction={deleteTransaction}
               onUpdateTransaction={updateTransaction}
@@ -209,6 +277,16 @@ function App() {
               onMarkPaidPlanned={markAsPaid}
               onSwitchTab={setActiveTab}
               viewMode={filterType}
+            />
+          )}
+
+          {activeTab === 'accounts' && (
+            <Accounts 
+              accounts={accounts} 
+              onAdd={addAccount} 
+              onUpdate={updateAccount} 
+              onDelete={deleteAccount} 
+              onTransfer={transferMoney}
             />
           )}
 
@@ -252,13 +330,29 @@ function App() {
           
           {activeTab === 'loans' && (
             <div className="animate-fade-in">
-              <header className="flex-between mb-md" style={{ alignItems: 'flex-end' }}>
+              <header className="flex-between mb-xl" style={{ alignItems: 'flex-end' }}>
                 <div>
-                  <h2 className="section-title">Loan Management</h2>
+                  <h2 className="section-title">Loan Tracker</h2>
                   <p className="section-subtitle" style={{ marginBottom: 0 }}>Detailed overview of all active and flexible loans.</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowAddLoanModal(true)}><Plus size={16} /> Add New Loan</button>
               </header>
+
+              <div className="summary-grid mb-xl" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                <div className="glass-panel summary-card" style={{ background: 'var(--slate-dark)', border: 'none' }}>
+                  <p className="card-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Remaining Balance</p>
+                  <h2 className="card-value" style={{ color: 'white' }}>Rs.{loans.reduce((sum, l) => sum + (Number(l.principal) - Number(l.paid)), 0).toLocaleString()}</h2>
+                  <div className="card-trend success">
+                    <CheckCircle size={14} /> <span>{Math.round((loans.reduce((sum, l) => sum + Number(l.paid), 0) / loans.reduce((sum, l) => sum + Number(l.principal), 1)) * 100)}% Repaid</span>
+                  </div>
+                </div>
+                
+                <div className="glass-panel summary-card">
+                  <p className="card-label">Total Principal</p>
+                  <h2 className="card-value">Rs.{loans.reduce((sum, l) => sum + Number(l.principal), 0).toLocaleString()}</h2>
+                  <div className="card-trend text-secondary"><Wallet size={14} /> <span>Across {loans.length} Loans</span></div>
+                </div>
+              </div>
               
               <div className="cashflow-table-container">
                 <table className="cashflow-table">

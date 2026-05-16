@@ -14,6 +14,7 @@ import {
 const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'accounts', label: 'Bank Accounts', icon: Wallet },
     { id: 'insights', label: 'Analysis & Compare', icon: PieChart },
     { id: 'planner', label: 'Future Planner', icon: CalendarClock },
     { id: 'transactions', label: 'Cash Flow', icon: History },

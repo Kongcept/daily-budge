@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TrendingUp, Plus, X, CreditCard, ArrowUpRight, ArrowDownLeft, Tag, AlignLeft, Trash2, Edit2, Droplet, Wallet, RefreshCw, PieChart as PieIcon, BarChart3, Clock, Check, ChevronRight, Zap, ChevronLeft } from 'lucide-react';
+import { TrendingUp, Plus, X, CreditCard, ArrowUpRight, ArrowDownLeft, Tag, AlignLeft, Trash2, Edit2, Droplet, Wallet, RefreshCw, PieChart as PieIcon, BarChart3, Clock, Check, ChevronRight, Zap, ChevronLeft, Landmark, DollarSign } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import './Dashboard.css';
 
-const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction, onDeleteTransaction, onUpdateTransaction, onAddLoan, onDeleteLoan, onUpdateLoan, onMarkPaidPlanned, onSwitchTab }) => {
+const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments = [], accounts = [], onAddTransaction, onDeleteTransaction, onUpdateTransaction, onAddLoan, onDeleteLoan, onUpdateLoan, onMarkPaidPlanned, onSwitchTab, viewMode }) => {
   const [showTransModal, setShowTransModal] = useState(false);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [editingTransId, setEditingTransId] = useState(null);
@@ -20,7 +20,7 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
   };
 
   const [transFormData, setTransFormData] = useState({
-    type: 'expense', amount: '', category: '', description: '', pricePerLiter: '', liters: '', date: today
+    type: 'expense', amount: '', category: '', description: '', pricePerLiter: '', liters: '', date: today, accountId: 'cash'
   });
 
   const [loanFormData, setLoanFormData] = useState({
@@ -92,14 +92,14 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
     else onAddTransaction(transFormData);
     setShowTransModal(false);
     setEditingTransId(null);
-    setTransFormData({ type: 'expense', amount: '', category: '', description: '', pricePerLiter: '', liters: '', date: today });
+    setTransFormData({ type: 'expense', amount: '', category: '', description: '', pricePerLiter: '', liters: '', date: today, accountId: 'cash' });
   };
 
 
 
   const openEditTrans = (t) => {
     setEditingTransId(t.id);
-    setTransFormData({ type: t.type, amount: t.amount, category: t.category, description: t.description || '', pricePerLiter: t.pricePerLiter || '', liters: t.liters || '', date: t.date });
+    setTransFormData({ type: t.type, amount: t.amount, category: t.category, description: t.description || '', pricePerLiter: t.pricePerLiter || '', liters: t.liters || '', date: t.date, accountId: t.accountId || 'cash' });
     setShowTransModal(true);
   };
 
@@ -110,7 +110,7 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
   };
 
   const openPaymentModal = (p) => {
-    setPaymentModal({ planned: p, payAmount: String(p.amount) });
+    setPaymentModal({ planned: p, payAmount: String(p.amount), accountId: 'cash' });
   };
 
   const handleLoanSubmit = (e) => {
@@ -138,7 +138,8 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
       amount: paidAmt,
       category: planned.category || 'Bills',
       description: `${paidAmt < fullAmt ? 'Partial payment' : 'Payment'}: ${planned.name}`,
-      date: today
+      date: today,
+      accountId: paymentModal.accountId
     });
     // Only mark as fully paid if full amount (or more) is paid
     if (paidAmt >= fullAmt) {
@@ -182,10 +183,29 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
         </div>
       </div>
 
-      <div className="summary-grid mb-xl">
-        <div className="glass-panel summary-card"><p className="card-label">Net Balance</p><h2 className="card-value">Rs.{balance.toLocaleString()}</h2><div className="card-trend success"><TrendingUp size={14} /> <span>Live Cash</span></div></div>
-        <div className="glass-panel summary-card"><p className="card-label">Total Debt</p><h2 className="card-value" style={{ color: 'var(--accent-danger)' }}>Rs.{remainingLoanBalance.toLocaleString()}</h2><div className="card-trend" style={{ color: 'var(--text-tertiary)' }}><Wallet size={14} /> <span>Payable</span></div></div>
-        <div className="glass-panel summary-card"><p className="card-label">Fuel (Month)</p><h2 className="card-value" style={{ color: 'var(--gold-primary)' }}>{monthlyFuelLiters.toFixed(1)} L</h2><div className="card-trend teal-text"><Droplet size={14} /> <span>Tracked</span></div></div>
+      <div className="summary-grid mb-xl" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+        <div className="glass-panel summary-card">
+          <p className="card-label">Bank Total</p>
+          <h2 className="card-value" style={{ color: 'var(--accent-success)' }}>Rs.{accounts.filter(a => a.id !== 'cash').reduce((sum, a) => sum + Number(a.balance), 0).toLocaleString()}</h2>
+          <div className="card-trend teal-text"><Landmark size={14} /> <span>Across Banks</span></div>
+        </div>
+        <div className="glass-panel summary-card">
+          <p className="card-label">Cash Balance</p>
+          <h2 className="card-value">Rs.{(accounts.find(a => a.id === 'cash')?.balance || 0).toLocaleString()}</h2>
+          <div className="card-trend success"><DollarSign size={14} /> <span>In Hand</span></div>
+        </div>
+        <div className="glass-panel summary-card">
+          <p className="card-label">Total Debt</p>
+          <h2 className="card-value" style={{ color: 'var(--accent-danger)' }}>Rs.{remainingLoanBalance.toLocaleString()}</h2>
+          <div className="card-trend" style={{ color: 'var(--slate-medium)', fontWeight: '600' }}>
+            <Wallet size={14} /> <span>Total: Rs.{loans.reduce((sum, l) => sum + Number(l.principal), 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="glass-panel summary-card">
+          <p className="card-label">Fuel (Month)</p>
+          <h2 className="card-value" style={{ color: 'var(--gold-primary)' }}>{monthlyFuelLiters.toFixed(1)} L</h2>
+          <div className="card-trend teal-text"><Droplet size={14} /> <span>Tracked</span></div>
+        </div>
       </div>
 
       {plannedPayments.length > 0 && (
@@ -287,6 +307,22 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
 
             <form onSubmit={handlePaymentSubmit}>
               <div className="form-group">
+                <label className="form-label">Payment Source</label>
+                <div className="category-chips">
+                  {accounts.map(acc => (
+                    <button 
+                      key={acc.id} 
+                      type="button" 
+                      className={`chip ${paymentModal.accountId === acc.id ? 'active' : ''}`} 
+                      onClick={() => setPaymentModal({...paymentModal, accountId: acc.id})}
+                    >
+                      {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '4px' }} /> : <Landmark size={12} style={{ marginRight: '4px' }} />}
+                      {acc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Payment Amount (Rs.)</label>
                 <input 
                   type="number" 
@@ -323,7 +359,24 @@ const Dashboard = ({ transactions, loans, plannedPayments = [], onAddTransaction
       {/* Transaction Modal */}
       {showTransModal && (
         <div className="modal-overlay"><div className="modal-content animate-fade-in" style={{ maxWidth: '440px' }}><div className="flex-between mb-lg"><h3>{editingTransId ? 'Edit Entry' : 'Quick Entry'}</h3><button className="btn-ghost" onClick={() => { setShowTransModal(false); setEditingTransId(null); }}><X size={20}/></button></div>
-            <form onSubmit={handleTransSubmit}><div className="form-group"><label className="form-label">Type</label><div className="type-toggle-group"><label className={`type-toggle-btn ${transFormData.type === 'expense' ? 'active expense' : ''}`}><input type="radio" checked={transFormData.type === 'expense'} onChange={() => setTransFormData({...transFormData, type: 'expense'})} /><ArrowDownLeft size={16} /> Expense</label><label className={`type-toggle-btn ${transFormData.type === 'income' ? 'active income' : ''}`}><input type="radio" checked={transFormData.type === 'income'} onChange={() => setTransFormData({...transFormData, type: 'income'})} /><ArrowUpRight size={16} /> Income</label></div></div>
+            <form onSubmit={handleTransSubmit}>
+              <div className="form-group">
+                <label className="form-label">Account / Wallet</label>
+                <div className="category-chips">
+                  {accounts.map(acc => (
+                    <button 
+                      key={acc.id} 
+                      type="button" 
+                      className={`chip ${transFormData.accountId === acc.id ? 'active' : ''}`} 
+                      onClick={() => setTransFormData({...transFormData, accountId: acc.id})}
+                    >
+                      {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '4px' }} /> : <Landmark size={12} style={{ marginRight: '4px' }} />}
+                      {acc.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="form-group"><label className="form-label">Type</label><div className="type-toggle-group"><label className={`type-toggle-btn ${transFormData.type === 'expense' ? 'active expense' : ''}`}><input type="radio" checked={transFormData.type === 'expense'} onChange={() => setTransFormData({...transFormData, type: 'expense'})} /><ArrowDownLeft size={16} /> Expense</label><label className={`type-toggle-btn ${transFormData.type === 'income' ? 'active income' : ''}`}><input type="radio" checked={transFormData.type === 'income'} onChange={() => setTransFormData({...transFormData, type: 'income'})} /><ArrowUpRight size={16} /> Income</label></div></div>
               <div className="form-group"><label className="form-label"><Tag size={12} style={{ marginRight: '4px' }} /> Categories</label><div className="category-chips">{commonCategories[transFormData.type].map(cat => (<button key={cat} type="button" className={`chip ${transFormData.category === cat ? 'active' : ''}`} onClick={() => setTransFormData({...transFormData, category: cat})}>{cat}</button>))}</div><input type="text" className="form-control" placeholder="Or custom..." style={{ marginTop: '8px' }} value={transFormData.category} onChange={e => setTransFormData({...transFormData, category: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Total Amount (Rs.)</label><input type="number" className="form-control" placeholder="0.00" value={transFormData.amount} onChange={e => setTransFormData({...transFormData, amount: e.target.value})} required /></div>
               {transFormData.category === 'Fuel' && (<div className="glass-panel" style={{ padding: '12px', marginBottom: '14px', backgroundColor: 'var(--bg-tertiary)' }}><div className="flex-between mb-xs"><label className="form-label" style={{ marginBottom: 0 }}>Price/L (Rs.)</label>{transFormData.liters && <span className="badge badge-gold">{transFormData.liters}L</span>}</div><input type="number" step="0.01" className="form-control" placeholder="e.g. 370.00" value={transFormData.pricePerLiter} onChange={e => setTransFormData({...transFormData, pricePerLiter: e.target.value})} /></div>)}
