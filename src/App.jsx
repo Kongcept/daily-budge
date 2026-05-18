@@ -36,7 +36,7 @@ function App() {
   // Loan Modal States
   const [showAddLoanModal, setShowAddLoanModal] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
-  const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
+  const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
 
   useEffect(() => {
     setTransactions(db.getTransactions());
@@ -209,7 +209,14 @@ function App() {
 
   const addLoan = (loan) => {
     setLoans([...loans, { ...loan, id: Date.now(), paid: Number(loan.paid || 0), type: loan.type || 'fixed' }]);
-    triggerNotification('Loan added successfully!');
+    // If user opted to add loan amount to an account, credit that account
+    if (loan.addToAccount && loan.targetAccountId && Number(loan.principal) > 0) {
+      updateAccountBalance(loan.targetAccountId, Number(loan.principal));
+      const acc = accounts.find(a => String(a.id) === String(loan.targetAccountId));
+      triggerNotification(`Loan added & Rs.${Number(loan.principal).toLocaleString()} credited to ${acc?.name || 'account'}!`);
+    } else {
+      triggerNotification('Loan added successfully!');
+    }
     setShowAddLoanModal(false);
     resetLoanForm();
   };
@@ -225,7 +232,7 @@ function App() {
   };
 
   const resetLoanForm = () => {
-    setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
+    setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
     setEditingLoan(null);
   };
 
@@ -242,7 +249,8 @@ function App() {
 
   const openEditLoan = (loan) => {
     setEditingLoan(loan);
-    setLoanFormData({ name: loan.name, principal: loan.principal, interest: loan.interest, dueDate: loan.dueDate, type: loan.type || 'fixed' });
+    // addToAccount is not shown when editing (only on creation)
+    setLoanFormData({ name: loan.name, principal: loan.principal, interest: loan.interest, dueDate: loan.dueDate, type: loan.type || 'fixed', addToAccount: false, targetAccountId: '' });
   };
 
   const handleLoanSubmit = (e) => {
@@ -499,7 +507,34 @@ function App() {
               <div className="form-group"><label className="form-label">Principal Amount (Rs.)</label><input type="number" className="form-control" placeholder="0" value={loanFormData.principal} onChange={e => setLoanFormData({...loanFormData, principal: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Interest Rate (%)</label><input type="number" step="0.1" className="form-control" placeholder="0.0" value={loanFormData.interest} onChange={e => setLoanFormData({...loanFormData, interest: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Due/Review Date</label><input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} /></div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>{editingLoan ? 'Update Details' : 'Add Loan'}</button>
+              {/* Add to Account Option — only shown when creating a new loan */}
+              {!editingLoan && (
+                <div className="form-group" style={{ background: 'var(--bg-secondary, #f7f8fa)', borderRadius: '12px', padding: '14px 16px', border: '1.5px solid var(--border-color)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${loanFormData.addToAccount ? 'var(--gold-primary, #f59e0b)' : 'var(--border-color)'}`, background: loanFormData.addToAccount ? 'var(--gold-primary, #f59e0b)' : 'transparent', transition: 'all 0.2s', flexShrink: 0 }}>
+                      {loanFormData.addToAccount && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      <input type="checkbox" checked={loanFormData.addToAccount} onChange={e => setLoanFormData({...loanFormData, addToAccount: e.target.checked, targetAccountId: e.target.checked ? loanFormData.targetAccountId : ''})} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }} />
+                    </span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--slate-dark)' }}>Add loan amount to account <span style={{ fontWeight: '400', color: 'var(--text-secondary, #6b7280)', fontSize: '0.78rem' }}>(received funds)</span></span>
+                  </label>
+                  {loanFormData.addToAccount && (
+                    <div style={{ marginTop: '10px' }}>
+                      <select
+                        className="form-control"
+                        value={loanFormData.targetAccountId}
+                        onChange={e => setLoanFormData({...loanFormData, targetAccountId: e.target.value})}
+                        required={loanFormData.addToAccount}
+                      >
+                        <option value="">Select account to credit...</option>
+                        {accounts.map(a => (
+                          <option key={a.id} value={a.id}>{a.name} — Rs.{Number(a.balance).toLocaleString()} ({a.type})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }}>{editingLoan ? 'Update Details' : 'Add Loan'}</button>
             </form>
           </div>
         </div>
