@@ -24,19 +24,20 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
   });
 
   const [loanFormData, setLoanFormData] = useState({
-    name: '', principal: '', interest: '', dueDate: today, type: 'fixed'
+    name: '', principal: '', interest: '', dueDate: today, type: 'fixed', addToAccount: true, targetAccountId: ''
   });
 
   const todayStats = transactions.reduce((acc, t) => {
     if (t.date === today) {
       if (t.type === 'income') acc.income += Number(t.amount);
-      else acc.expense += Number(t.amount);
+      else if (t.type === 'expense') acc.expense += Number(t.amount);
+      // 'loan' type is excluded — not income nor a spending expense
     }
     return acc;
   }, { income: 0, expense: 0 });
 
   const categoryData = transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => t.type === 'expense') // explicitly only 'expense', excludes 'loan' and 'income'
     .reduce((acc, t) => {
       const existing = acc.find(item => item.name === t.category);
       if (existing) existing.value += Number(t.amount);
@@ -55,6 +56,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
   const trendData = last7Days.map(date => {
     const income = transactions.filter(t => t.date === date && t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
     const expense = transactions.filter(t => t.date === date && t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+    // 'loan' type excluded from both income and expense trend bars
     return { date: date.slice(5), income, expense };
   });
 
@@ -87,7 +89,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
     return () => window.removeEventListener('open-transaction-modal', handleOpenModal);
   }, []);
 
-  const balance = transactions.reduce((sum, t) => sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount)), 0);
+  const balance = transactions.filter(t => t.type !== 'loan').reduce((sum, t) => sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount)), 0);
   const remainingLoanBalance = loans.reduce((sum, l) => sum + (Number(l.principal) - Number(l.paid)), 0);
   const currentMonth = new Date().toISOString().slice(0, 7);
   const monthlyFuelLiters = transactions.filter(t => t.category === 'Fuel' && t.date.startsWith(currentMonth)).reduce((sum, t) => sum + Number(t.liters || 0), 0);
@@ -111,7 +113,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
 
   const openEditLoan = (l) => {
     setEditingLoanId(l.id);
-    setLoanFormData({ name: l.name, principal: l.principal, interest: l.interest, dueDate: l.dueDate, type: l.type || 'fixed' });
+    setLoanFormData({ name: l.name, principal: l.principal, interest: l.interest, dueDate: l.dueDate, type: l.type || 'fixed', addToAccount: false, targetAccountId: '' });
     setShowLoanModal(true);
   };
 
@@ -287,7 +289,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
       </div>
 
       <div className="loan-grid">
-        <div className="glass-panel" style={{ padding: '20px' }}><h3 className="section-title">Recent Activity</h3><div className="activity-list scrollable-area" style={{ maxHeight: '350px' }}>{[...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).map((t, idx) => { const isIncome = t.type === 'income'; const typeColor = isIncome ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'; const borderColor = isIncome ? '#10B981' : '#EF4444'; return (<div key={t.id} className="activity-item flex-between" style={{ padding: '10px 14px', marginBottom: '6px', borderRadius: '8px', background: typeColor, borderLeft: `4px solid ${borderColor}` }}><div style={{ flex: 1 }}><p style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--slate-dark)' }}>{t.category} {t.liters && <span className="badge badge-gold" style={{ marginLeft: '6px' }}>{t.liters}L</span>}</p><p className="text-secondary" style={{ fontSize: '0.7rem' }}>{t.date} {t.description && `• ${t.description}`}</p></div><div className="flex-center gap-md"><div style={{ fontWeight: '800', fontSize: '0.85rem', textAlign: 'right', color: isIncome ? 'var(--accent-success)' : 'var(--accent-danger)' }}>{isIncome ? '+' : '-'}Rs.{Number(t.amount).toLocaleString()}</div><div className="item-actions"><button className="btn-icon-small" onClick={() => openEditTrans(t)}><Edit2 size={11}/></button><button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete entry?')) onDeleteTransaction(t.id); }}><Trash2 size={11}/></button></div></div></div>); })}</div></div>
+        <div className="glass-panel" style={{ padding: '20px' }}><h3 className="section-title">Recent Activity</h3><div className="activity-list scrollable-area" style={{ maxHeight: '350px' }}>{[...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).map((t, idx) => { const isIncome = t.type === 'income'; const isLoan = t.type === 'loan'; const typeColor = isLoan ? 'rgba(139, 92, 246, 0.08)' : isIncome ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)'; const borderColor = isLoan ? '#8B5CF6' : isIncome ? '#10B981' : '#EF4444'; const amtColor = isLoan ? '#8B5CF6' : isIncome ? 'var(--accent-success)' : 'var(--accent-danger)'; return (<div key={t.id} className="activity-item flex-between" style={{ padding: '10px 14px', marginBottom: '6px', borderRadius: '8px', background: typeColor, borderLeft: `4px solid ${borderColor}` }}><div style={{ flex: 1 }}><p style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--slate-dark)', display: 'flex', alignItems: 'center', gap: '6px' }}>{t.category} {isLoan && <span className="badge badge-violet" style={{ fontSize: '0.58rem', padding: '1px 6px' }}>LOAN</span>}{t.liters && <span className="badge badge-gold" style={{ marginLeft: '6px' }}>{t.liters}L</span>}</p><p className="text-secondary" style={{ fontSize: '0.7rem' }}>{t.date} {t.description && `• ${t.description}`}</p></div><div className="flex-center gap-md"><div style={{ fontWeight: '800', fontSize: '0.85rem', textAlign: 'right', color: amtColor }}>{isLoan ? '↓' : isIncome ? '+' : '-'}Rs.{Number(t.amount).toLocaleString()}</div><div className="item-actions">{!isLoan && <button className="btn-icon-small" onClick={() => openEditTrans(t)}><Edit2 size={11}/></button>}<button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete entry?')) onDeleteTransaction(t.id); }}><Trash2 size={11}/></button></div></div></div>); })}</div></div>
         <div className="glass-panel" style={{ padding: '20px' }}><h3 className="section-title">Active Loans</h3><div className="loan-summary-list scrollable-area" style={{ maxHeight: '350px' }}>{loans.map(loan => { const remaining = loan.principal - loan.paid; const progress = (loan.paid / loan.principal) * 100; const isFlexible = loan.type === 'flexible'; return (<div key={loan.id} className="activity-item mb-md" style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: '8px', border: '1px solid var(--border-color)' }}><div className="flex-between mb-xs"><div><span style={{ fontWeight: '700', fontSize: '0.8rem', display: 'block' }}>{loan.name}</span><span style={{ fontSize: '0.72rem', color: 'var(--accent-danger)', fontWeight: '600' }}>Rs.{remaining.toLocaleString()}</span></div><div className="flex-center gap-xs"><div className="item-actions"><button className="btn-icon-small" onClick={() => openEditLoan(loan)}><Edit2 size={10}/></button><button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete loan?')) onDeleteLoan(loan.id); }}><Trash2 size={10}/></button></div><span className={`badge ${isFlexible ? 'badge-gold' : 'badge-violet'}`} style={{ fontSize: '0.6rem' }}>{isFlexible ? 'Flex' : `${Math.round(progress)}%`}</span></div></div>{!isFlexible && <div className="progress-bar-bg" style={{ height: '4px' }}><div className="progress-bar teal" style={{ width: `${progress}%` }}></div></div>}</div>); })}</div></div>
       </div>
 
@@ -405,7 +407,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
           <div className="modal-content animate-fade-in" style={{ maxWidth: '440px' }}>
             <div className="flex-between mb-lg">
               <h3>{editingLoanId ? 'Edit Loan' : 'Add New Loan'}</h3>
-              <button className="btn-ghost" onClick={() => { setShowLoanModal(false); setEditingLoanId(null); setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' }); }}><X size={20}/></button>
+              <button className="btn-ghost" onClick={() => { setShowLoanModal(false); setEditingLoanId(null); setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' }); }}><X size={20}/></button>
             </div>
             <form onSubmit={handleLoanSubmit}>
               <div className="form-group">
@@ -423,7 +425,48 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
               <div className="form-group"><label className="form-label">Principal Amount (Rs.)</label><input type="number" className="form-control" placeholder="0" value={loanFormData.principal} onChange={e => setLoanFormData({...loanFormData, principal: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Interest Rate (%)</label><input type="number" step="0.1" className="form-control" placeholder="0.0" value={loanFormData.interest} onChange={e => setLoanFormData({...loanFormData, interest: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Due/Review Date</label><input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} /></div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>{editingLoanId ? 'Update Details' : 'Add Loan'}</button>
+              {/* Add to Account — only on new loan, chip-based quick select */}
+              {!editingLoanId && (
+                <div className="form-group" style={{ background: 'var(--bg-secondary, #f7f8fa)', borderRadius: '12px', padding: '12px 14px', border: `1.5px solid ${loanFormData.addToAccount ? 'var(--gold-primary, #f59e0b)' : 'var(--border-color)'}`, transition: 'border-color 0.2s' }}>
+                  {/* Checkbox row */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none', marginBottom: loanFormData.addToAccount ? '10px' : '0' }}>
+                    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${loanFormData.addToAccount ? 'var(--gold-primary, #f59e0b)' : 'var(--border-color)'}`, background: loanFormData.addToAccount ? 'var(--gold-primary, #f59e0b)' : 'transparent', transition: 'all 0.2s', flexShrink: 0 }}>
+                      {loanFormData.addToAccount && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      <input type="checkbox" checked={loanFormData.addToAccount} onChange={e => setLoanFormData({...loanFormData, addToAccount: e.target.checked, targetAccountId: ''})} style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }} />
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--slate-dark)' }}>Credit to account <span style={{ fontWeight: '400', color: 'var(--text-secondary, #6b7280)', fontSize: '0.76rem' }}>(received funds)</span></span>
+                  </label>
+                  {/* Account chips — shown only when checked */}
+                  {loanFormData.addToAccount && (
+                    <div className="category-chips" style={{ gap: '6px' }}>
+                      {accounts.map(acc => (
+                        <button
+                          key={acc.id}
+                          type="button"
+                          className={`chip ${loanFormData.targetAccountId === String(acc.id) ? 'active' : ''}`}
+                          onClick={() => setLoanFormData({...loanFormData, targetAccountId: String(acc.id)})}
+                          style={{ fontSize: '0.78rem' }}
+                        >
+                          {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '3px' }} /> : <Landmark size={12} style={{ marginRight: '3px' }} />}
+                          {acc.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Validation hint */}
+                  {loanFormData.addToAccount && !loanFormData.targetAccountId && (
+                    <p style={{ fontSize: '0.72rem', color: 'var(--accent-danger)', marginTop: '6px', fontWeight: '600' }}>⚠ Select an account to credit</p>
+                  )}
+                </div>
+              )}
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '10px' }}
+                disabled={!editingLoanId && loanFormData.addToAccount && !loanFormData.targetAccountId}
+              >
+                {editingLoanId ? 'Update Details' : 'Add Loan'}
+              </button>
             </form>
           </div>
         </div>

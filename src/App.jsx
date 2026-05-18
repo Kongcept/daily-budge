@@ -208,11 +208,23 @@ function App() {
   };
 
   const addLoan = (loan) => {
-    setLoans([...loans, { ...loan, id: Date.now(), paid: Number(loan.paid || 0), type: loan.type || 'fixed' }]);
-    // If user opted to add loan amount to an account, credit that account
+    const loanId = Date.now();
+    setLoans(prev => [...prev, { ...loan, id: loanId, paid: Number(loan.paid || 0), type: loan.type || 'fixed' }]);
+    // If user opted to add loan amount to an account, credit that account AND log it as a "loan" transaction
     if (loan.addToAccount && loan.targetAccountId && Number(loan.principal) > 0) {
-      updateAccountBalance(loan.targetAccountId, Number(loan.principal));
       const acc = accounts.find(a => String(a.id) === String(loan.targetAccountId));
+      // Create a "loan" type transaction — distinct from income so it won't skew income charts
+      const loanTransaction = {
+        id: loanId + 1,
+        type: 'loan',
+        amount: Number(loan.principal),
+        category: 'Loan Received',
+        description: `Loan received: ${loan.name}`,
+        date: getTodayDate(),
+        accountId: loan.targetAccountId,
+      };
+      setTransactions(prev => [...prev, loanTransaction]);
+      updateAccountBalance(loan.targetAccountId, Number(loan.principal));
       triggerNotification(`Loan added & Rs.${Number(loan.principal).toLocaleString()} credited to ${acc?.name || 'account'}!`);
     } else {
       triggerNotification('Loan added successfully!');
