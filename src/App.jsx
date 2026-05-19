@@ -91,14 +91,24 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const ledgerTransactions = useMemo(() => {
+    let balance = 0;
+    // Sort chronologically (oldest first) to compute running balance
+    return [...transactions].sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => {
+      if (t.type === 'income' || t.type === 'loan') balance += Number(t.amount);
+      else if (t.type === 'expense') balance -= Number(t.amount);
+      return { ...t, runningBalance: balance };
+    });
+  }, [transactions]);
+
   const filteredTransactions = useMemo(() => {
-    if (filterType === 'all') return transactions;
+    if (filterType === 'all') return ledgerTransactions;
     if (filterType === 'year') {
       const year = selectedMonth.split('-')[0];
-      return transactions.filter(t => t.date.startsWith(year));
+      return ledgerTransactions.filter(t => t.date.startsWith(year));
     }
-    return transactions.filter(t => t.date.startsWith(selectedMonth));
-  }, [transactions, selectedMonth, filterType]);
+    return ledgerTransactions.filter(t => t.date.startsWith(selectedMonth));
+  }, [ledgerTransactions, selectedMonth, filterType]);
 
   const triggerNotification = (message) => {
     setNotification(message);
@@ -382,26 +392,38 @@ function App() {
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Category</th>
-                        <th>Details</th>
-                        <th>Type</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>Category & Details</th>
+                        <th style={{ textAlign: 'right' }}>Income</th>
+                        <th style={{ textAlign: 'right' }}>Expense</th>
+                        <th style={{ textAlign: 'right' }}>Balance</th>
                         <th style={{ textAlign: 'center' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredTransactions.slice().reverse().map(t => (
+                      {filteredTransactions.slice().reverse().map(t => {
+                        const isIncomeOrLoan = t.type === 'income' || t.type === 'loan';
+                        return (
                         <tr key={t.id}>
                           <td>{t.date}</td>
-                          <td style={{ fontWeight: '600' }}>{t.category}{t.liters && <span className="badge badge-gold" style={{ marginLeft: '8px' }}>{t.liters}L</span>}</td>
-                          <td className="text-secondary" style={{ fontSize: '0.85rem' }}>{t.description || '-'}{t.pricePerLiter && <span style={{ display: 'block', fontSize: '0.7rem' }}>@ Rs.{t.pricePerLiter}/L</span>}</td>
-                          <td><span className={`badge ${t.type === 'income' ? 'badge-success' : 'badge-danger'}`}>{t.type}</span></td>
-                          <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'income' ? 'var(--accent-success)' : 'var(--accent-danger)' }}>Rs.{Number(t.amount).toLocaleString()}</td>
+                          <td>
+                            <div style={{ fontWeight: '600' }}>{t.category}{t.type === 'loan' && <span className="badge badge-violet" style={{ fontSize: '0.6rem', padding: '1px 6px', marginLeft: '6px' }}>LOAN</span>}{t.liters && <span className="badge badge-gold" style={{ marginLeft: '8px' }}>{t.liters}L</span>}</div>
+                            <div className="text-secondary" style={{ fontSize: '0.85rem' }}>{t.description || '-'}{t.pricePerLiter && <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>@ Rs.{t.pricePerLiter}/L</span>}</div>
+                          </td>
+                          <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'income' ? 'var(--accent-success)' : t.type === 'loan' ? '#8B5CF6' : 'inherit' }}>
+                            {isIncomeOrLoan ? `Rs.${Number(t.amount).toLocaleString()}` : '-'}
+                          </td>
+                          <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'expense' ? 'var(--accent-danger)' : 'inherit' }}>
+                            {t.type === 'expense' ? `Rs.${Number(t.amount).toLocaleString()}` : '-'}
+                          </td>
+                          <td style={{ fontWeight: '800', textAlign: 'right', color: 'var(--slate-dark)' }}>
+                            Rs.{Number(t.runningBalance).toLocaleString()}
+                          </td>
                           <td style={{ textAlign: 'center' }}>
                             <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete this entry?')) deleteTransaction(t.id); }}><Trash2 size={14} /></button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                  </table>
               </div>
