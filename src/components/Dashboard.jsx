@@ -24,7 +24,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
   });
 
   const [loanFormData, setLoanFormData] = useState({
-    name: '', principal: '', interest: '', dueDate: today, type: 'fixed', addToAccount: true, targetAccountId: ''
+    name: '', principal: '', interest: '', date: today, hasDueDate: false, dueDate: today, type: 'fixed', addToAccount: true, targetAccountId: ''
   });
 
   const todayStats = transactions.reduce((acc, t) => {
@@ -113,7 +113,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
 
   const openEditLoan = (l) => {
     setEditingLoanId(l.id);
-    setLoanFormData({ name: l.name, principal: l.principal, interest: l.interest, dueDate: l.dueDate, type: l.type || 'fixed', addToAccount: false, targetAccountId: '' });
+    setLoanFormData({ name: l.name, principal: l.principal, interest: l.interest, date: l.date || getTodayDate(), hasDueDate: !!l.dueDate, dueDate: l.dueDate || getTodayDate(), type: l.type || 'fixed', addToAccount: false, targetAccountId: '' });
     setShowLoanModal(true);
   };
 
@@ -123,14 +123,15 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
 
   const handleLoanSubmit = (e) => {
     e.preventDefault();
+    const finalData = { ...loanFormData, dueDate: loanFormData.hasDueDate ? loanFormData.dueDate : '' };
     if (editingLoanId) {
-      onUpdateLoan(editingLoanId, loanFormData);
+      onUpdateLoan(editingLoanId, finalData);
     } else {
-      onAddLoan(loanFormData);
+      onAddLoan(finalData);
     }
     setShowLoanModal(false);
     setEditingLoanId(null);
-    setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed' });
+    setLoanFormData({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
   };
 
   const handlePaymentSubmit = (e) => {
@@ -407,7 +408,7 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
           <div className="modal-content animate-fade-in" style={{ maxWidth: '440px' }}>
             <div className="flex-between mb-lg">
               <h3>{editingLoanId ? 'Edit Loan' : 'Add New Loan'}</h3>
-              <button className="btn-ghost" onClick={() => { setShowLoanModal(false); setEditingLoanId(null); setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' }); }}><X size={20}/></button>
+              <button className="btn-ghost" onClick={() => { setShowLoanModal(false); setEditingLoanId(null); setLoanFormData({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' }); }}><X size={20}/></button>
             </div>
             <form onSubmit={handleLoanSubmit}>
               <div className="form-group">
@@ -424,7 +425,14 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
               <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-control" placeholder="e.g. Personal Loan" value={loanFormData.name} onChange={e => setLoanFormData({...loanFormData, name: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Principal Amount (Rs.)</label><input type="number" className="form-control" placeholder="0" value={loanFormData.principal} onChange={e => setLoanFormData({...loanFormData, principal: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Interest Rate (%)</label><input type="number" step="0.1" className="form-control" placeholder="0.0" value={loanFormData.interest} onChange={e => setLoanFormData({...loanFormData, interest: e.target.value})} required /></div>
-              <div className="form-group"><label className="form-label">Due/Review Date</label><input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Loan Date</label><input type="date" className="form-control" value={loanFormData.date} onChange={e => setLoanFormData({...loanFormData, date: e.target.value})} required /></div>
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={loanFormData.hasDueDate} onChange={e => setLoanFormData({...loanFormData, hasDueDate: e.target.checked})} style={{ margin: 0, cursor: 'pointer' }} />
+                  Due/Review Date
+                </label>
+                <input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} disabled={!loanFormData.hasDueDate} style={{ opacity: loanFormData.hasDueDate ? 1 : 0.5 }} />
+              </div>
               {/* Add to Account — only on new loan, chip-based quick select */}
               {!editingLoanId && (
                 <div className="form-group" style={{ background: 'var(--bg-secondary, #f7f8fa)', borderRadius: '12px', padding: '12px 14px', border: `1.5px solid ${loanFormData.addToAccount ? 'var(--gold-primary, #f59e0b)' : 'var(--border-color)'}`, transition: 'border-color 0.2s' }}>

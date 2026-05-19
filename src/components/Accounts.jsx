@@ -24,6 +24,7 @@ const Accounts = ({ accounts, onAdd, onUpdate, onDelete, onTransfer }) => {
 
   const handleTransfer = (e) => {
     e.preventDefault();
+    if (!transferData.fromId || !transferData.toId) return alert("Please select both accounts.");
     if (transferData.fromId === transferData.toId) return alert("Source and destination cannot be the same.");
     onTransfer(transferData.fromId, transferData.toId, Number(transferData.amount));
     setShowTransferModal(false);
@@ -160,17 +161,37 @@ const Accounts = ({ accounts, onAdd, onUpdate, onDelete, onTransfer }) => {
             <form onSubmit={handleTransfer}>
               <div className="form-group">
                 <label className="form-label">From Account</label>
-                <select className="form-control" value={transferData.fromId} onChange={e => setTransferData({...transferData, fromId: e.target.value})} required>
-                  <option value="">Select source...</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} (Rs.{a.balance.toLocaleString()})</option>)}
-                </select>
+                <div className="category-chips" style={{ gap: '6px' }}>
+                  {accounts.map(a => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className={`chip ${transferData.fromId === String(a.id) ? 'active' : ''}`}
+                      onClick={() => setTransferData({...transferData, fromId: String(a.id)})}
+                      style={{ fontSize: '0.78rem' }}
+                    >
+                      {a.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '3px' }} /> : <Landmark size={12} style={{ marginRight: '3px' }} />}
+                      {a.name} — Rs.{Number(a.balance).toLocaleString()}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">To Account</label>
-                <select className="form-control" value={transferData.toId} onChange={e => setTransferData({...transferData, toId: e.target.value})} required>
-                  <option value="">Select destination...</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} (Rs.{a.balance.toLocaleString()})</option>)}
-                </select>
+                <div className="category-chips" style={{ gap: '6px' }}>
+                  {accounts.map(a => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className={`chip ${transferData.toId === String(a.id) ? 'active' : ''}`}
+                      onClick={() => setTransferData({...transferData, toId: String(a.id)})}
+                      style={{ fontSize: '0.78rem' }}
+                    >
+                      {a.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '3px' }} /> : <Landmark size={12} style={{ marginRight: '3px' }} />}
+                      {a.name} — Rs.{Number(a.balance).toLocaleString()}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Transfer Amount (Rs.)</label>

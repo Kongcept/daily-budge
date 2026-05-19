@@ -5,7 +5,7 @@ import Insights from './components/Insights';
 import Planner from './components/Planner';
 import Accounts from './components/Accounts';
 import { db } from './db';
-import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet } from 'lucide-react';
+import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet, DollarSign, Landmark } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -42,7 +42,7 @@ function App() {
   // Loan Modal States
   const [showAddLoanModal, setShowAddLoanModal] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
-  const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
+  const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
 
   useEffect(() => db.saveTransactions(transactions), [transactions]);
   useEffect(() => db.saveLoans(loans), [loans]);
@@ -213,7 +213,7 @@ function App() {
         amount: Number(loan.principal),
         category: 'Loan Received',
         description: `Loan received: ${loan.name}`,
-        date: getTodayDate(),
+        date: loan.date || getTodayDate(),
         accountId: loan.targetAccountId,
       };
       setTransactions(prev => [...prev, loanTransaction]);
@@ -237,7 +237,7 @@ function App() {
   };
 
   const resetLoanForm = () => {
-    setLoanFormData({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
+    setLoanFormData({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
     setEditingLoan(null);
   };
 
@@ -255,13 +255,14 @@ function App() {
   const openEditLoan = (loan) => {
     setEditingLoan(loan);
     // addToAccount is not shown when editing (only on creation)
-    setLoanFormData({ name: loan.name, principal: loan.principal, interest: loan.interest, dueDate: loan.dueDate, type: loan.type || 'fixed', addToAccount: false, targetAccountId: '' });
+    setLoanFormData({ name: loan.name, principal: loan.principal, interest: loan.interest, date: loan.date || getTodayDate(), hasDueDate: !!loan.dueDate, dueDate: loan.dueDate || getTodayDate(), type: loan.type || 'fixed', addToAccount: false, targetAccountId: '' });
   };
 
   const handleLoanSubmit = (e) => {
     e.preventDefault();
-    if (editingLoan) updateLoan(editingLoan.id, loanFormData);
-    else addLoan(loanFormData);
+    const finalData = { ...loanFormData, dueDate: loanFormData.hasDueDate ? loanFormData.dueDate : '' };
+    if (editingLoan) updateLoan(editingLoan.id, finalData);
+    else addLoan(finalData);
     resetLoanForm();
   };
 
@@ -511,7 +512,14 @@ function App() {
               <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-control" placeholder="e.g. Personal Loan" value={loanFormData.name} onChange={e => setLoanFormData({...loanFormData, name: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Principal Amount (Rs.)</label><input type="number" className="form-control" placeholder="0" value={loanFormData.principal} onChange={e => setLoanFormData({...loanFormData, principal: e.target.value})} required /></div>
               <div className="form-group"><label className="form-label">Interest Rate (%)</label><input type="number" step="0.1" className="form-control" placeholder="0.0" value={loanFormData.interest} onChange={e => setLoanFormData({...loanFormData, interest: e.target.value})} required /></div>
-              <div className="form-group"><label className="form-label">Due/Review Date</label><input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Loan Date</label><input type="date" className="form-control" value={loanFormData.date} onChange={e => setLoanFormData({...loanFormData, date: e.target.value})} required /></div>
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={loanFormData.hasDueDate} onChange={e => setLoanFormData({...loanFormData, hasDueDate: e.target.checked})} style={{ margin: 0, cursor: 'pointer' }} />
+                  Due/Review Date
+                </label>
+                <input type="date" className="form-control" value={loanFormData.dueDate} onChange={e => setLoanFormData({...loanFormData, dueDate: e.target.value})} disabled={!loanFormData.hasDueDate} style={{ opacity: loanFormData.hasDueDate ? 1 : 0.5 }} />
+              </div>
               {/* Add to Account Option — only shown when creating a new loan */}
               {!editingLoan && (
                 <div className="form-group" style={{ background: 'var(--bg-secondary, #f7f8fa)', borderRadius: '12px', padding: '14px 16px', border: '1.5px solid var(--border-color)' }}>
@@ -523,18 +531,19 @@ function App() {
                     <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--slate-dark)' }}>Add loan amount to account <span style={{ fontWeight: '400', color: 'var(--text-secondary, #6b7280)', fontSize: '0.78rem' }}>(received funds)</span></span>
                   </label>
                   {loanFormData.addToAccount && (
-                    <div style={{ marginTop: '10px' }}>
-                      <select
-                        className="form-control"
-                        value={loanFormData.targetAccountId}
-                        onChange={e => setLoanFormData({...loanFormData, targetAccountId: e.target.value})}
-                        required={loanFormData.addToAccount}
-                      >
-                        <option value="">Select account to credit...</option>
-                        {accounts.map(a => (
-                          <option key={a.id} value={a.id}>{a.name} — Rs.{Number(a.balance).toLocaleString()} ({a.type})</option>
-                        ))}
-                      </select>
+                    <div className="category-chips" style={{ marginTop: '10px', gap: '6px' }}>
+                      {accounts.map(a => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className={`chip ${loanFormData.targetAccountId === String(a.id) ? 'active' : ''}`}
+                          onClick={() => setLoanFormData({...loanFormData, targetAccountId: String(a.id)})}
+                          style={{ fontSize: '0.78rem' }}
+                        >
+                          {a.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '3px' }} /> : <Landmark size={12} style={{ marginRight: '3px' }} />}
+                          {a.name}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
