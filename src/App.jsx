@@ -22,12 +22,18 @@ function App() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  // Core Data
-  const [transactions, setTransactions] = useState([]);
-  const [loans, setLoans] = useState([]);
-  const [plannedPayments, setPlannedPayments] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-
+  // Core Data (Lazy initialization prevents accidental wipes during hot reloads)
+  const [transactions, setTransactions] = useState(() => db.getTransactions());
+  const [loans, setLoans] = useState(() => db.getLoans());
+  const [plannedPayments, setPlannedPayments] = useState(() => db.getPlannedPayments());
+  const [accounts, setAccounts] = useState(() => {
+    let storedAccounts = db.getAccounts();
+    if (!storedAccounts || storedAccounts.length === 0) {
+      storedAccounts = [{ id: 'cash', name: 'Cash', balance: 0, type: 'cash' }];
+      db.saveAccounts(storedAccounts);
+    }
+    return storedAccounts;
+  });
 
   // Filters
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
@@ -37,19 +43,6 @@ function App() {
   const [showAddLoanModal, setShowAddLoanModal] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
-
-  useEffect(() => {
-    setTransactions(db.getTransactions());
-    setLoans(db.getLoans());
-    setPlannedPayments(db.getPlannedPayments());
-    
-    let storedAccounts = db.getAccounts();
-    if (!storedAccounts || storedAccounts.length === 0) {
-      storedAccounts = [{ id: 'cash', name: 'Cash', balance: 0, type: 'cash' }];
-      db.saveAccounts(storedAccounts);
-    }
-    setAccounts(storedAccounts);
-  }, []);
 
   useEffect(() => db.saveTransactions(transactions), [transactions]);
   useEffect(() => db.saveLoans(loans), [loans]);
