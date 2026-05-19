@@ -55,12 +55,12 @@ const Accounts = ({ accounts, onAdd, onUpdate, onDelete, onTransfer }) => {
 
   return (
     <div className="animate-fade-in">
-      <header className="flex-between mb-xl">
+      <header className="page-header flex-between mb-xl">
         <div>
           <h1 className="page-title">Bank Accounts</h1>
           <p className="text-secondary">Manage your cash, bank balances and transfers.</p>
         </div>
-        <div className="flex-center gap-md">
+        <div className="header-actions flex-center gap-md">
           <button className="btn btn-ghost" onClick={() => setShowTransferModal(true)}>
             <ArrowRightLeft size={16} /> Transfer Money
           </button>

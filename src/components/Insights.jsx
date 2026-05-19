@@ -57,8 +57,12 @@ const Insights = ({ transactions }) => {
 
   return (
     <div className="animate-fade-in">
-      <h2 className="section-title">Analysis & Compare</h2>
-      <p className="section-subtitle">Select up to 3 months to compare your financial performance side-by-side.</p>
+      <header className="page-header mb-xl">
+        <div>
+          <h1 className="page-title">Analysis & Compare</h1>
+          <p className="text-secondary">Select up to 3 months to compare your financial performance side-by-side.</p>
+        </div>
+      </header>
 
       {/* Month Selector Bar */}
       <div className="glass-panel mb-lg" style={{ padding: '16px' }}>

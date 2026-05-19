@@ -98,7 +98,9 @@
 .scrollable-area {
   max-height: 340px;
   overflow-y: auto;
+  overflow-x: auto;
   padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Activity items — compact */

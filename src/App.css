@@ -35,7 +35,7 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
   max-width: calc(100vw - var(--sidebar-collapsed-width));
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .app-container { flex-direction: column; }
   .main-content {
     margin-left: 0 !important;
@@ -46,6 +46,15 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
 }
 
 .page-container { max-width: 1400px; margin: 0 auto; }
+
+/* Page Headers */
+.page-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.header-actions {
+  flex-wrap: wrap;
+}
 
 /* Filter Bar Fixes */
 .filter-bar {
@@ -168,6 +177,7 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
 
 .nav-icon { min-width: 20px; }
 .nav-label { margin-left: 12px; font-size: 0.85rem; }
+.nav-label--desktop-hidden { display: none; }
 
 .active-indicator {
   position: absolute;
@@ -189,6 +199,81 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
 .user-info { margin-left: 10px; }
 .user-name { font-weight: 600; font-size: 0.8rem; }
 .user-role { font-size: 0.65rem; color: rgba(255,255,255,0.4); }
+
+/* Mobile Bottom Navigation (Sidebar) */
+@media (max-width: 1024px) {
+  .sidebar, .sidebar.collapsed {
+    width: 100%;
+    height: auto;
+    min-height: 60px;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    padding: 6px 4px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    align-items: center;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    z-index: 1000;
+  }
+  
+  /* Hide desktop-specific elements */
+  .sidebar-header, .sidebar-footer, .collapse-toggle-btn {
+    display: none !important;
+  }
+  
+  .sidebar-nav {
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    gap: 0;
+  }
+  
+  .nav-item, .collapsed .nav-item {
+    flex-direction: column;
+    padding: 6px 2px;
+    gap: 4px;
+    border-radius: 10px;
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .nav-icon {
+    min-width: auto;
+    margin: 0 auto;
+  }
+  
+  .nav-label {
+    display: block !important;
+    font-size: 0.6rem;
+    font-weight: 600;
+    margin-left: 0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  
+  .nav-item.active {
+    background: transparent; /* Remove solid background on mobile to prevent squishing */
+    color: var(--gold-primary);
+    box-shadow: none;
+  }
+  
+  .active-indicator {
+    display: none;
+  }
+
+  /* Hide tooltips on bottom nav because labels are already visible */
+  .sidebar.collapsed .nav-item::after {
+    display: none !important;
+  }
+}
 
 /* Buttons */
 .btn { 
