@@ -51,7 +51,8 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
             data-tooltip={isCollapsed ? `${item.label} (${item.key})` : ""}
           >
             <item.icon size={20} className="nav-icon" />
-            {!isCollapsed && <span className="nav-label">{item.label}</span>}
+            {/* On desktop: hide when collapsed. On mobile: always show as bottom-nav label */}
+            <span className={`nav-label ${isCollapsed ? 'nav-label--desktop-hidden' : ''}`}>{item.label}</span>
             {activeTab === item.id && !isCollapsed && <div className="active-indicator"></div>}
           </button>
         ))}

@@ -292,15 +292,15 @@ function App() {
 
           {activeTab !== 'insights' && activeTab !== 'planner' && activeTab !== 'settings' && (
             <div className="filter-bar mb-lg glass-panel">
-              <div className="flex-center gap-md">
+              <div className="flex-center gap-sm flex-wrap">
                 <div className="flex-center gap-sm">
                   <Calendar size={16} className="text-gold" />
-                  <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--slate-medium)', whiteSpace: 'nowrap' }}>FILTER VIEW:</span>
+                  <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--slate-medium)', whiteSpace: 'nowrap' }}>FILTER:</span>
                 </div>
                 <div className="filter-options flex-center gap-xs">
-                   <button className={`filter-btn ${filterType === 'month' ? 'active' : ''}`} onClick={() => setFilterType('month')}>Monthly</button>
-                   <button className={`filter-btn ${filterType === 'year' ? 'active' : ''}`} onClick={() => setFilterType('year')}>Yearly</button>
-                   <button className={`filter-btn ${filterType === 'all' ? 'active' : ''}`} onClick={() => setFilterType('all')}>All Time</button>
+                   <button className={`filter-btn ${filterType === 'month' ? 'active' : ''}`} onClick={() => setFilterType('month')}>Month</button>
+                   <button className={`filter-btn ${filterType === 'year' ? 'active' : ''}`} onClick={() => setFilterType('year')}>Year</button>
+                   <button className={`filter-btn ${filterType === 'all' ? 'active' : ''}`} onClick={() => setFilterType('all')}>All</button>
                 </div>
                 {filterType !== 'all' && (
                   <div className="date-input-wrapper">
@@ -317,8 +317,8 @@ function App() {
                   </div>
                 )}
               </div>
-              <div className="text-secondary" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
-                 Showing <span className="text-gold" style={{ fontWeight: '800' }}>{filteredTransactions.length}</span> records
+              <div className="text-secondary" style={{ fontSize: '0.75rem', fontWeight: '500', whiteSpace: 'nowrap' }}>
+                 <span className="text-gold" style={{ fontWeight: '800' }}>{filteredTransactions.length}</span> records
               </div>
             </div>
           )}

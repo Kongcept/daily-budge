@@ -7,6 +7,16 @@
   color: var(--slate-dark);
 }
 
+/* Dashboard Header */
+.dashboard-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-actions {
+  flex-wrap: wrap;
+}
+
 /* Summary Cards — compact 4-col row */
 .summary-grid {
   display: grid;
@@ -210,6 +220,14 @@
 }
 
 @media (max-width: 600px) {
+  .summary-grid { grid-template-columns: 1fr 1fr; }
+  .page-title { font-size: 1.2rem; }
+  .section-title { font-size: 0.82rem; }
+  .card-value { font-size: 1.35rem; }
+}
+
+@media (max-width: 440px) {
   .summary-grid { grid-template-columns: 1fr; }
-  .page-title { font-size: 1.3rem; }
+  .type-toggle-group { flex-direction: column; }
+  .type-toggle-btn { justify-content: flex-start; }
 }

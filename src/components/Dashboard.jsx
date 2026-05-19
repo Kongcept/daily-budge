@@ -174,27 +174,27 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
         </div>
       </header>
 
-      <div className="glass-panel mb-xl flex-between flex-wrap" style={{ padding: '14px 24px', background: 'var(--slate-dark)', border: 'none' }}>
+      <div className="glass-panel mb-xl flex-between flex-wrap" style={{ padding: '12px 20px', background: 'var(--slate-dark)', border: 'none', gap: '12px' }}>
         <div className="flex-center gap-md">
-           <div className="badge badge-gold" style={{ width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Zap size={20} fill="white" /></div>
+           <div className="badge badge-gold" style={{ width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Zap size={18} fill="white" /></div>
            <div>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Pulse</p>
-              <h3 style={{ color: 'white', fontWeight: '800' }}>{today}</h3>
+              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.68rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Pulse</p>
+              <h3 style={{ color: 'white', fontWeight: '800', fontSize: '0.9rem' }}>{today}</h3>
            </div>
         </div>
-        <div className="flex-center gap-xl">
+        <div className="flex-center gap-lg flex-wrap" style={{ gap: '12px' }}>
            <div style={{ textAlign: 'right' }}>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem' }}>Income Today</p>
-              <p style={{ color: '#10B981', fontWeight: '800', fontSize: '1.1rem' }}>+ Rs.{todayStats.income.toLocaleString()}</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.68rem' }}>Income Today</p>
+              <p style={{ color: '#10B981', fontWeight: '800', fontSize: '1rem' }}>+ Rs.{todayStats.income.toLocaleString()}</p>
            </div>
            <div style={{ textAlign: 'right' }}>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem' }}>Cost Today</p>
-              <p style={{ color: '#EF4444', fontWeight: '800', fontSize: '1.1rem' }}>- Rs.{todayStats.expense.toLocaleString()}</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.68rem' }}>Cost Today</p>
+              <p style={{ color: '#EF4444', fontWeight: '800', fontSize: '1rem' }}>- Rs.{todayStats.expense.toLocaleString()}</p>
            </div>
-           <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.1)' }}></div>
+           <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.1)' }}></div>
            <div style={{ textAlign: 'right' }}>
-              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem' }}>Daily Net</p>
-              <p style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1.1rem' }}>Rs.{(todayStats.income - todayStats.expense).toLocaleString()}</p>
+              <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.68rem' }}>Daily Net</p>
+              <p style={{ color: 'var(--gold-primary)', fontWeight: '800', fontSize: '1rem' }}>Rs.{(todayStats.income - todayStats.expense).toLocaleString()}</p>
            </div>
         </div>
       </div>
