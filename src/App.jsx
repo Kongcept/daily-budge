@@ -233,6 +233,19 @@ function App() {
 
   const updateLoan = (id, updatedData) => {
     setLoans(loans.map(l => l.id === id ? { ...l, ...updatedData } : l));
+    // Sync the underlying transaction so Recent Activity sorts correctly
+    setTransactions(prev => prev.map(t => {
+      // The transaction associated with a loan is created with id: loan.id + 1
+      if (t.type === 'loan' && t.id === id + 1) {
+        return {
+          ...t,
+          date: updatedData.date || t.date,
+          amount: updatedData.principal ? Number(updatedData.principal) : t.amount,
+          description: updatedData.name ? `Loan received: ${updatedData.name}` : t.description,
+        };
+      }
+      return t;
+    }));
     triggerNotification('Loan details updated!');
   };
 
