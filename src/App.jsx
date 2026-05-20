@@ -22,18 +22,43 @@ function App() {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   };
 
-  // Core Data (Lazy initialization prevents accidental wipes during hot reloads)
-  const [transactions, setTransactions] = useState(() => db.getTransactions());
-  const [loans, setLoans] = useState(() => db.getLoans());
-  const [plannedPayments, setPlannedPayments] = useState(() => db.getPlannedPayments());
-  const [accounts, setAccounts] = useState(() => {
-    let storedAccounts = db.getAccounts();
-    if (!storedAccounts || storedAccounts.length === 0) {
-      storedAccounts = [{ id: 'cash', name: 'Cash', balance: 0, type: 'cash' }];
-      db.saveAccounts(storedAccounts);
-    }
-    return storedAccounts;
-  });
+  // Core Data (Async initialization for Database)
+  const [transactions, setTransactions] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [plannedPayments, setPlannedPayments] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [fetchedTransactions, fetchedLoans, fetchedPlanned, fetchedAccounts] = await Promise.all([
+          db.getTransactions(),
+          db.getLoans(),
+          db.getPlannedPayments(),
+          db.getAccounts()
+        ]);
+        
+        setTransactions(fetchedTransactions || []);
+        setLoans(fetchedLoans || []);
+        setPlannedPayments(fetchedPlanned || []);
+        
+        if (!fetchedAccounts || fetchedAccounts.length === 0) {
+          const defaultAccounts = [{ id: 'cash', name: 'Cash', balance: 0, type: 'cash' }];
+          setAccounts(defaultAccounts);
+          // Wait for save so we don't accidentally wipe it
+          await db.saveAccounts(defaultAccounts);
+        } else {
+          setAccounts(fetchedAccounts);
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   // Filters
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
@@ -44,10 +69,10 @@ function App() {
   const [editingLoan, setEditingLoan] = useState(null);
   const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
 
-  useEffect(() => db.saveTransactions(transactions), [transactions]);
-  useEffect(() => db.saveLoans(loans), [loans]);
-  useEffect(() => db.savePlannedPayments(plannedPayments), [plannedPayments]);
-  useEffect(() => db.saveAccounts(accounts), [accounts]);
+  useEffect(() => { if (!isLoading) db.saveTransactions(transactions); }, [transactions, isLoading]);
+  useEffect(() => { if (!isLoading) db.saveLoans(loans); }, [loans, isLoading]);
+  useEffect(() => { if (!isLoading) db.savePlannedPayments(plannedPayments); }, [plannedPayments, isLoading]);
+  useEffect(() => { if (!isLoading) db.saveAccounts(accounts); }, [accounts, isLoading]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -288,6 +313,17 @@ function App() {
     else addLoan(finalData);
     resetLoanForm();
   };
+
+  if (isLoading) {
+    return (
+      <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-primary)' }}>
+        <div className="flex-column flex-center gap-md">
+          <RefreshCw className="spin text-gold" size={32} />
+          <p style={{ fontWeight: '600' }}>Loading your finances...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`app-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
