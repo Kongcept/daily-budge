@@ -228,18 +228,25 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
   
   .sidebar-nav {
     flex-direction: row;
-    justify-content: space-around;
+    justify-content: flex-start;
     width: 100%;
-    gap: 0;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
   }
   
   .nav-item, .collapsed .nav-item {
     flex-direction: column;
-    padding: 6px 2px;
+    padding: 6px 10px;
     gap: 4px;
     border-radius: 10px;
-    flex: 1;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 72px;
     justify-content: center;
     align-items: center;
   }
@@ -251,7 +258,7 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
   
   .nav-label {
     display: block !important;
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     font-weight: 600;
     margin-left: 0;
     text-align: center;
@@ -262,7 +269,7 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
   }
   
   .nav-item.active {
-    background: transparent; /* Remove solid background on mobile to prevent squishing */
+    background: rgba(212, 175, 55, 0.1);
     color: var(--gold-primary);
     box-shadow: none;
   }
@@ -481,10 +488,106 @@ body { background: var(--bg-secondary); color: var(--slate-dark); line-height: 1
     border-radius: 20px 20px 0 0 !important;
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 92vh;
+    max-height: 90vh;
     padding: 24px 20px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     margin: 0;
+    overflow-y: auto;
   }
 }
 
+/* Custom Premium Checkbox for Loan Tracker */
+.premium-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
 
+.premium-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid var(--border-color);
+  background: transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.premium-checkbox:hover {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.12);
+}
+
+.premium-checkbox.checked {
+  border-color: var(--gold-primary);
+  background: var(--gold-primary);
+}
+
+.premium-checkbox.indeterminate {
+  border-color: var(--gold-primary);
+}
+
+.premium-checkbox input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Summary Cards & Grid for Detailed Tabs */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.summary-card {
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: var(--gold-primary);
+}
+
+.card-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.card-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--slate-dark);
+  line-height: 1.1;
+}
+
+.card-trend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.card-trend.success { color: var(--accent-success); }
+.card-trend.danger { color: var(--accent-danger); }
+.card-trend.teal-text { color: var(--gold-dark); }

@@ -167,11 +167,11 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
 
   return (
     <div className="dashboard animate-fade-in">
-      <header className="dashboard-header flex-between mb-xl">
-        <div><h1 className="page-title">Daily Summary</h1><p className="text-secondary">Managing your finances in Sri Lankan Rupees (LKR).</p></div>
-        <div className="header-actions flex-center gap-md">
-          <button className="btn btn-ghost" onClick={() => setShowLoanModal(true)}><CreditCard size={18} /> Add Loan</button>
-          <button className="btn btn-primary" onClick={() => setShowTransModal(true)}><Plus size={18} /> Add Transaction</button>
+      <header className="dashboard-header flex-between flex-wrap gap-md mb-xl">
+        <div style={{ flex: '1 1 300px' }}><h1 className="page-title" style={{ fontSize: '1.5rem', marginBottom: '4px' }}>Daily Summary</h1><p className="text-secondary" style={{ fontSize: '0.85rem' }}>Managing your finances in Sri Lankan Rupees (LKR).</p></div>
+        <div className="header-actions flex-center gap-sm" style={{ flex: '1 1 auto', justifyContent: 'flex-start' }}>
+          <button className="btn btn-ghost" onClick={() => setShowLoanModal(true)}><CreditCard size={16} /> Add Loan</button>
+          <button className="btn btn-primary" onClick={() => setShowTransModal(true)}><Plus size={16} /> Add Transaction</button>
         </div>
       </header>
 
@@ -262,9 +262,9 @@ const Dashboard = ({ transactions, allTransactions = [], loans, plannedPayments 
                     border: '1px solid var(--border-color)',
                     // Auto-adjust logic: 
                     // If < 5 items: grow to fill space (flex: 1)
-                    // If >= 5 items: lock width to exactly 1/5th of container minus gaps
-                    flex: cardCount < 5 ? '1 1 0' : '0 0 calc((100% - 64px) / 5)',
-                    minWidth: cardCount < 5 ? '180px' : '0'
+                    // If >= 5 items: allow horizontal scroll with consistent min-width
+                    flex: cardCount < 5 ? '1 1 0' : '0 0 auto',
+                    minWidth: '180px'
                   }}
                 >
                   <div className="flex-center gap-md" style={{ overflow: 'hidden' }}>

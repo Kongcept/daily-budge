@@ -5,7 +5,7 @@ import Insights from './components/Insights';
 import Planner from './components/Planner';
 import Accounts from './components/Accounts';
 import { db } from './db';
-import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet, DollarSign, Landmark } from 'lucide-react';
+import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet, DollarSign, Landmark, Check, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -63,6 +63,12 @@ function App() {
   // Filters
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [filterType, setFilterType] = useState('month'); 
+
+  // Loan Selection state (default: all selected)
+  const [excludedLoanIds, setExcludedLoanIds] = useState([]);
+  const selectedLoans = useMemo(() => {
+    return loans.filter(l => !excludedLoanIds.includes(l.id));
+  }, [loans, excludedLoanIds]);
 
   // Loan Modal States
   const [showAddLoanModal, setShowAddLoanModal] = useState(false);
@@ -419,52 +425,93 @@ function App() {
             />
           )}
           
-          {activeTab === 'transactions' && (
-            <div className="animate-fade-in">
-              <h2 className="section-title">Cash Flow</h2>
-              <p className="section-subtitle">Detailed history of all your income and expenses.</p>
-              <div className="cashflow-table-container">
-                 <table className="cashflow-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Category & Details</th>
-                        <th style={{ textAlign: 'right' }}>Income</th>
-                        <th style={{ textAlign: 'right' }}>Expense</th>
-                        <th style={{ textAlign: 'right' }}>Balance</th>
-                        <th style={{ textAlign: 'center' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredTransactions.slice().reverse().map(t => {
-                        const isIncomeOrLoan = t.type === 'income' || t.type === 'loan';
-                        return (
-                        <tr key={t.id}>
-                          <td>{t.date}</td>
-                          <td>
-                            <div style={{ fontWeight: '600' }}>{t.category}{t.type === 'loan' && <span className="badge badge-violet" style={{ fontSize: '0.6rem', padding: '1px 6px', marginLeft: '6px' }}>LOAN</span>}{t.liters && <span className="badge badge-gold" style={{ marginLeft: '8px' }}>{t.liters}L</span>}</div>
-                            <div className="text-secondary" style={{ fontSize: '0.85rem' }}>{t.description || '-'}{t.pricePerLiter && <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>@ Rs.{t.pricePerLiter}/L</span>}</div>
-                          </td>
-                          <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'income' ? 'var(--accent-success)' : t.type === 'loan' ? '#8B5CF6' : 'inherit' }}>
-                            {isIncomeOrLoan ? `Rs.${Number(t.amount).toLocaleString()}` : '-'}
-                          </td>
-                          <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'expense' ? 'var(--accent-danger)' : 'inherit' }}>
-                            {t.type === 'expense' ? `Rs.${Number(t.amount).toLocaleString()}` : '-'}
-                          </td>
-                          <td style={{ fontWeight: '800', textAlign: 'right', color: 'var(--slate-dark)' }}>
-                            Rs.{Number(t.runningBalance).toLocaleString()}
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete this entry?')) deleteTransaction(t.id); }}><Trash2 size={14} /></button>
-                          </td>
+          {activeTab === 'transactions' && (() => {
+            const stats = filteredTransactions.reduce((acc, t) => {
+              const amt = Number(t.amount);
+              if (t.type === 'income' || t.type === 'loan') acc.income += amt;
+              else if (t.type === 'expense') acc.expense += amt;
+              return acc;
+            }, { income: 0, expense: 0 });
+            
+            const netSavings = stats.income - stats.expense;
+
+            return (
+              <div className="animate-fade-in">
+                <h2 className="section-title">Cash Flow</h2>
+                <p className="section-subtitle">Detailed history of all your income and expenses.</p>
+
+                {/* Summary Cards */}
+                <div className="summary-grid mb-xl" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+                  <div className="glass-panel summary-card" style={{ borderLeft: '3px solid var(--accent-success)' }}>
+                    <p className="card-label">Total Incoming</p>
+                    <h2 className="card-value" style={{ color: 'var(--accent-success)' }}>Rs.{stats.income.toLocaleString()}</h2>
+                    <div className="card-trend success">
+                      <ArrowUpRight size={14} /> <span>Total Inflow</span>
+                    </div>
+                  </div>
+                  
+                  <div className="glass-panel summary-card" style={{ borderLeft: '3px solid var(--accent-danger)' }}>
+                    <p className="card-label">Total Outgoing</p>
+                    <h2 className="card-value" style={{ color: 'var(--accent-danger)' }}>Rs.{stats.expense.toLocaleString()}</h2>
+                    <div className="card-trend danger">
+                      <ArrowDownLeft size={14} /> <span>Total Outflow</span>
+                    </div>
+                  </div>
+
+                  <div className="glass-panel summary-card" style={{ borderLeft: `3px solid ${netSavings >= 0 ? 'var(--gold-primary)' : 'var(--accent-danger)'}` }}>
+                    <p className="card-label">Net Savings</p>
+                    <h2 className="card-value" style={{ color: netSavings >= 0 ? 'var(--gold-primary)' : 'var(--accent-danger)' }}>
+                      {netSavings >= 0 ? '+' : '-'}Rs.{Math.abs(netSavings).toLocaleString()}
+                    </h2>
+                    <div className="card-trend" style={{ color: 'var(--slate-medium)' }}>
+                      <Wallet size={14} /> <span>{netSavings >= 0 ? 'Surplus' : 'Deficit'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="cashflow-table-container">
+                   <table className="cashflow-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Category & Details</th>
+                          <th style={{ textAlign: 'right' }}>Income</th>
+                          <th style={{ textAlign: 'right' }}>Expense</th>
+                          <th style={{ textAlign: 'right' }}>Balance</th>
+                          <th style={{ textAlign: 'center' }}>Actions</th>
                         </tr>
-                        );
-                      })}
-                    </tbody>
-                 </table>
+                      </thead>
+                      <tbody>
+                        {filteredTransactions.slice().reverse().map(t => {
+                          const isIncomeOrLoan = t.type === 'income' || t.type === 'loan';
+                          return (
+                          <tr key={t.id}>
+                            <td>{t.date}</td>
+                            <td>
+                              <div style={{ fontWeight: '600' }}>{t.category}{t.type === 'loan' && <span className="badge badge-violet" style={{ fontSize: '0.6rem', padding: '1px 6px', marginLeft: '6px' }}>LOAN</span>}{t.liters && <span className="badge badge-gold" style={{ marginLeft: '8px' }}>{t.liters}L</span>}</div>
+                              <div className="text-secondary" style={{ fontSize: '0.85rem' }}>{t.description || '-'}{t.pricePerLiter && <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>@ Rs.{t.pricePerLiter}/L</span>}</div>
+                            </td>
+                            <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'income' ? 'var(--accent-success)' : t.type === 'loan' ? '#8B5CF6' : 'inherit' }}>
+                              {isIncomeOrLoan ? `Rs.${Number(t.amount).toLocaleString()}` : '-'}
+                            </td>
+                            <td style={{ fontWeight: '700', textAlign: 'right', color: t.type === 'expense' ? 'var(--accent-danger)' : 'inherit' }}>
+                              {t.type === 'expense' ? `Rs.${Number(t.amount).toLocaleString()}` : '-'}
+                            </td>
+                            <td style={{ fontWeight: '800', textAlign: 'right', color: 'var(--slate-dark)' }}>
+                              Rs.{Number(t.runningBalance).toLocaleString()}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete this entry?')) deleteTransaction(t.id); }}><Trash2 size={14} /></button>
+                            </td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                   </table>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           
           {activeTab === 'loans' && (
             <div className="animate-fade-in">
@@ -479,16 +526,29 @@ function App() {
               <div className="summary-grid mb-xl" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
                 <div className="glass-panel summary-card" style={{ background: 'var(--slate-dark)', border: 'none' }}>
                   <p className="card-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Remaining Balance</p>
-                  <h2 className="card-value" style={{ color: 'white' }}>Rs.{loans.reduce((sum, l) => sum + (Number(l.principal) - Number(l.paid)), 0).toLocaleString()}</h2>
+                  <h2 className="card-value" style={{ color: 'white' }}>Rs.{selectedLoans.reduce((sum, l) => sum + (Number(l.principal) - Number(l.paid)), 0).toLocaleString()}</h2>
                   <div className="card-trend success">
-                    <CheckCircle size={14} /> <span>{Math.round((loans.reduce((sum, l) => sum + Number(l.paid), 0) / loans.reduce((sum, l) => sum + Number(l.principal), 1)) * 100)}% Repaid</span>
+                    <CheckCircle size={14} /> <span>
+                      {selectedLoans.length > 0
+                        ? `${Math.round((selectedLoans.reduce((sum, l) => sum + Number(l.paid), 0) / selectedLoans.reduce((sum, l) => sum + Number(l.principal), 1)) * 100)}% Repaid`
+                        : '0% Repaid'
+                      }
+                    </span>
                   </div>
                 </div>
                 
                 <div className="glass-panel summary-card">
                   <p className="card-label">Total Principal</p>
-                  <h2 className="card-value">Rs.{loans.reduce((sum, l) => sum + Number(l.principal), 0).toLocaleString()}</h2>
-                  <div className="card-trend text-secondary"><Wallet size={14} /> <span>Across {loans.length} Loans</span></div>
+                  <h2 className="card-value">Rs.{selectedLoans.reduce((sum, l) => sum + Number(l.principal), 0).toLocaleString()}</h2>
+                  <div className="card-trend text-secondary">
+                    <Wallet size={14} /> 
+                    <span>
+                      {selectedLoans.length === loans.length 
+                        ? `Across all ${loans.length} Loans` 
+                        : `${selectedLoans.length} of ${loans.length} Loans Selected`
+                      }
+                    </span>
+                  </div>
                 </div>
               </div>
               
@@ -496,6 +556,25 @@ function App() {
                 <table className="cashflow-table">
                   <thead>
                     <tr>
+                      <th style={{ width: '40px', textAlign: 'center', paddingRight: '0' }}>
+                        <label className="premium-checkbox-label">
+                          <span className={`premium-checkbox ${selectedLoans.length === loans.length ? 'checked' : (selectedLoans.length > 0 && selectedLoans.length < loans.length) ? 'indeterminate' : ''}`}>
+                            {selectedLoans.length === loans.length && <Check size={11} strokeWidth={3} className="text-white" style={{ color: 'white' }} />}
+                            {selectedLoans.length > 0 && selectedLoans.length < loans.length && <div style={{ width: '8px', height: '2px', background: 'var(--gold-primary)', borderRadius: '1px' }}></div>}
+                            <input 
+                              type="checkbox" 
+                              checked={selectedLoans.length === loans.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setExcludedLoanIds([]);
+                                } else {
+                                  setExcludedLoanIds(loans.map(l => l.id));
+                                }
+                              }}
+                            />
+                          </span>
+                        </label>
+                      </th>
                       <th style={{ width: '22%' }}>Loan Details</th>
                       <th style={{ width: '15%' }}>Timeline</th>
                       <th>Type</th>
@@ -507,13 +586,32 @@ function App() {
                   </thead>
                   <tbody>
                     {loans.map(loan => {
+                      const isSelected = !excludedLoanIds.includes(loan.id);
                       const remaining = loan.principal - loan.paid;
                       const progress = (loan.paid / loan.principal) * 100;
                       const isFlexible = loan.type === 'flexible';
                       const daysLeft = getDaysRemaining(loan.dueDate);
                       const isOverdue = daysLeft !== null && daysLeft < 0;
                       return (
-                        <tr key={loan.id}>
+                        <tr key={loan.id} style={{ opacity: isSelected ? 1 : 0.6, transition: 'opacity 0.25s' }}>
+                          <td style={{ textAlign: 'center', paddingRight: '0' }}>
+                            <label className="premium-checkbox-label">
+                              <span className={`premium-checkbox ${isSelected ? 'checked' : ''}`}>
+                                {isSelected && <Check size={11} strokeWidth={3} className="text-white" style={{ color: 'white' }} />}
+                                <input 
+                                  type="checkbox" 
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setExcludedLoanIds(prev => prev.filter(id => id !== loan.id));
+                                    } else {
+                                      setExcludedLoanIds(prev => [...prev, loan.id]);
+                                    }
+                                  }}
+                                />
+                              </span>
+                            </label>
+                          </td>
                           <td><div style={{ fontWeight: '700' }}>{loan.name}</div><div className="text-secondary" style={{ fontSize: '0.75rem' }}>Start/Due: {loan.dueDate || 'N/A'}</div></td>
                           <td>
                             {loan.dueDate ? (
