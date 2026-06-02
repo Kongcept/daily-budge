@@ -5,7 +5,7 @@ import Insights from './components/Insights';
 import Planner from './components/Planner';
 import Accounts from './components/Accounts';
 import { db } from './db';
-import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet, DollarSign, Landmark, Check, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { CheckCircle, Edit2, Trash2, X, RefreshCw, Plus, CreditCard, Calendar, Filter, Clock, Wallet, DollarSign, Landmark, Check, ArrowUpRight, ArrowDownLeft, History } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -75,6 +75,8 @@ function App() {
   const [editingLoan, setEditingLoan] = useState(null);
   const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
   const [loanPaymentModal, setLoanPaymentModal] = useState(null); // { loan, amount, isInterestOnly, accountId, inputId }
+  const [historyLoanId, setHistoryLoanId] = useState(null); // ID of loan whose history is being viewed
+  const [editingPayment, setEditingPayment] = useState(null); // Payment transaction currently being edited
 
   useEffect(() => { if (!isLoading) db.saveTransactions(transactions); }, [transactions, isLoading]);
   useEffect(() => { if (!isLoading) db.saveLoans(loans); }, [loans, isLoading]);
@@ -162,19 +164,49 @@ function App() {
     triggerNotification('Transaction recorded!');
   };
 
+  const findLoanIdFromDescription = (trans) => {
+    if (trans.loanId) return trans.loanId;
+    if (trans.category !== 'Loan Payment' && trans.category !== 'Loan Interest') return null;
+    
+    // Try to match based on description "for [loanName]"
+    const match = trans.description?.match(/for\s+(.+)$/i);
+    if (match) {
+      const loanName = match[1].trim();
+      const matchedLoan = loans.find(l => l.name.toLowerCase() === loanName.toLowerCase());
+      return matchedLoan ? matchedLoan.id : null;
+    }
+    return null;
+  };
+
   const deleteTransaction = (id) => {
     const trans = transactions.find(t => t.id === id);
-    if (trans && trans.accountId) {
+    if (!trans) return;
+    
+    if (trans.accountId) {
       // Reverse balance change
       updateAccountBalance(trans.accountId, trans.type === 'income' ? -Number(trans.amount) : Number(trans.amount));
     }
+    
+    // Sync with Loan if it's a loan payment
+    const loanId = findLoanIdFromDescription(trans);
+    const isInterestOnly = trans.isInterestOnly || trans.category === 'Loan Interest';
+    if (loanId && !isInterestOnly) {
+      const loan = loans.find(l => l.id === loanId);
+      if (loan) {
+        const newPaid = Math.max(0, Number(loan.paid) - Number(trans.amount));
+        setLoans(prevLoans => prevLoans.map(l => l.id === loanId ? { ...l, paid: newPaid } : l));
+      }
+    }
+    
     setTransactions(transactions.filter(t => t.id !== id));
     triggerNotification('Entry deleted.');
   };
 
   const updateTransaction = (id, updatedTrans) => {
     const oldTrans = transactions.find(t => t.id === id);
-    if (oldTrans && oldTrans.accountId) {
+    if (!oldTrans) return;
+    
+    if (oldTrans.accountId) {
       // Reverse old balance
       updateAccountBalance(oldTrans.accountId, oldTrans.type === 'income' ? -Number(oldTrans.amount) : Number(oldTrans.amount));
     }
@@ -182,6 +214,26 @@ function App() {
       // Apply new balance
       updateAccountBalance(updatedTrans.accountId, updatedTrans.type === 'income' ? Number(updatedTrans.amount) : -Number(updatedTrans.amount));
     }
+    
+    // Sync with Loan if it was or is a loan payment
+    const oldLoanId = findLoanIdFromDescription(oldTrans);
+    const newLoanId = findLoanIdFromDescription(updatedTrans);
+    const wasInterestOnly = oldTrans.isInterestOnly || oldTrans.category === 'Loan Interest';
+    const isInterestOnly = updatedTrans.isInterestOnly || updatedTrans.category === 'Loan Interest';
+    
+    if (oldLoanId || newLoanId) {
+      setLoans(prevLoans => prevLoans.map(l => {
+        let currentPaid = Number(l.paid);
+        if (l.id === oldLoanId && !wasInterestOnly) {
+          currentPaid = Math.max(0, currentPaid - Number(oldTrans.amount));
+        }
+        if (l.id === newLoanId && !isInterestOnly) {
+          currentPaid = currentPaid + Number(updatedTrans.amount);
+        }
+        return l.id === oldLoanId || l.id === newLoanId ? { ...l, paid: currentPaid } : l;
+      }));
+    }
+    
     setTransactions(transactions.map(t => t.id === id ? { ...t, ...updatedTrans } : t));
     triggerNotification('Entry updated!');
   };
@@ -303,7 +355,9 @@ function App() {
     addTransaction({
       type: 'expense', amount: amount, category: isInterestOnly ? 'Loan Interest' : 'Loan Payment',
       description: `${isInterestOnly ? 'Interest payment' : 'Principal payment'} for ${loan.name}`, date: getTodayDate(),
-      accountId: accountId
+      accountId: accountId,
+      loanId: loanId,
+      isInterestOnly: isInterestOnly
     });
     triggerNotification(`${isInterestOnly ? 'Interest' : 'Principal'} payment recorded!`);
   };
@@ -664,8 +718,9 @@ function App() {
                                     }}>Int</button>}
                               </div>
                               <div style={{ borderLeft: '1px solid var(--border-color)', height: '18px', margin: '0 2px' }}></div>
-                              <button className="btn-icon-small" onClick={() => openEditLoan(loan)}><Edit2 size={11}/></button>
-                              <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete loan?')) deleteLoan(loan.id); }}><Trash2 size={11}/></button>
+                              <button className="btn-icon-small" onClick={() => setHistoryLoanId(loan.id)} title="View Payment History"><History size={11}/></button>
+                              <button className="btn-icon-small" onClick={() => openEditLoan(loan)} title="Edit Loan"><Edit2 size={11}/></button>
+                              <button className="btn-icon-small danger" onClick={() => { if(window.confirm('Delete loan?')) deleteLoan(loan.id); }} title="Delete Loan"><Trash2 size={11}/></button>
                             </div>
                           </td>
                         </tr>
@@ -824,6 +879,350 @@ function App() {
                 <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setLoanPaymentModal(null)}>Cancel</button>
                 <button type="submit" className="btn btn-success" style={{ flex: 2 }}>
                   <Check size={16} /> Confirm Payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Loan Payment Modal */}
+      {loanPaymentModal && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content animate-fade-in" style={{ maxWidth: '400px' }}>
+            <div className="flex-between mb-lg">
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>
+                  {loanPaymentModal.isInterestOnly ? 'Pay Loan Interest' : 'Record Loan Payment'}
+                </h3>
+                <p className="text-secondary" style={{ fontSize: '0.8rem' }}>{loanPaymentModal.loan.name}</p>
+              </div>
+              <button 
+                className="btn-ghost" 
+                style={{ padding: '6px', borderRadius: '8px', border: 'none', cursor: 'pointer' }} 
+                onClick={() => setLoanPaymentModal(null)}
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            {/* Loan Outstanding Balance Card */}
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
+              <div className="flex-between mb-xs">
+                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Loan Principal</span>
+                <span style={{ fontWeight: '700', fontSize: '0.8rem' }}>Rs.{Number(loanPaymentModal.loan.principal).toLocaleString()}</span>
+              </div>
+              <div className="flex-between mb-xs">
+                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Total Paid</span>
+                <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--accent-success)' }}>Rs.{Number(loanPaymentModal.loan.paid).toLocaleString()}</span>
+              </div>
+              <div className="flex-between">
+                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Outstanding Principal</span>
+                <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--accent-danger)' }}>
+                  Rs.{(Number(loanPaymentModal.loan.principal) - Number(loanPaymentModal.loan.paid)).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const { loan, amount, isInterestOnly, accountId, inputId } = loanPaymentModal;
+              const paidAmt = Number(amount);
+              if (paidAmt <= 0) return;
+              
+              recordLoanPayment(loan.id, paidAmt, isInterestOnly, accountId);
+              
+              // Clear the input element if it exists in the DOM
+              if (inputId) {
+                const inputEl = document.getElementById(inputId);
+                if (inputEl) inputEl.value = '';
+              }
+              
+              setLoanPaymentModal(null);
+            }}>
+              <div className="form-group">
+                <label className="form-label">Payment Source</label>
+                <div className="category-chips" style={{ gap: '6px' }}>
+                  {accounts.map(acc => (
+                    <button 
+                      key={acc.id} 
+                      type="button" 
+                      className={`chip ${loanPaymentModal.accountId === acc.id ? 'active' : ''}`} 
+                      onClick={() => setLoanPaymentModal({...loanPaymentModal, accountId: acc.id})}
+                    >
+                      {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '4px' }} /> : <Landmark size={12} style={{ marginRight: '4px' }} />}
+                      {acc.name} (Rs.{Number(acc.balance).toLocaleString()})
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Payment Amount (Rs.)</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  style={{ fontSize: '1.1rem', fontWeight: '700', textAlign: 'center' }}
+                  value={loanPaymentModal.amount}
+                  onChange={e => setLoanPaymentModal({ ...loanPaymentModal, amount: e.target.value })}
+                  min="1"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex-center gap-md" style={{ marginTop: '16px' }}>
+                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setLoanPaymentModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-success" style={{ flex: 2 }}>
+                  <Check size={16} /> Confirm Payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Loan Payment History Modal */}
+      {historyLoanId && (() => {
+        const loan = loans.find(l => l.id === historyLoanId);
+        if (!loan) return null;
+        
+        // Dynamic legacy & standard payment history retrieval
+        const history = transactions.filter(t => 
+          (t.loanId === historyLoanId) || 
+          (!t.loanId && 
+           (t.category === 'Loan Payment' || t.category === 'Loan Interest') && 
+           t.description?.includes(`for ${loan.name}`))
+        );
+        
+        return (
+          <div className="modal-overlay" style={{ zIndex: 2500 }}>
+            <div className="modal-content animate-fade-in" style={{ maxWidth: '600px', width: '90%' }}>
+              <div className="flex-between mb-lg">
+                <div>
+                  <h3 style={{ marginBottom: '4px' }}>Payment History</h3>
+                  <p className="text-secondary" style={{ fontSize: '0.85rem' }}>History of payments for: <span style={{ fontWeight: '700', color: 'var(--slate-dark)' }}>{loan.name}</span></p>
+                </div>
+                <button 
+                  className="btn-ghost" 
+                  style={{ padding: '6px', borderRadius: '8px', border: 'none', cursor: 'pointer' }} 
+                  onClick={() => setHistoryLoanId(null)}
+                >
+                  <X size={20}/>
+                </button>
+              </div>
+
+              {/* Loan Progress Card */}
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div>
+                  <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '700', color: 'var(--text-secondary)' }}>Principal</p>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--slate-dark)', marginTop: '4px' }}>Rs.{loan.principal.toLocaleString()}</h4>
+                </div>
+                <div>
+                  <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '700', color: 'var(--text-secondary)' }}>Repaid</p>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--accent-success)', marginTop: '4px' }}>Rs.{loan.paid.toLocaleString()}</h4>
+                </div>
+                <div>
+                  <p style={{ fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: '700', color: 'var(--text-secondary)' }}>Remaining</p>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--accent-danger)', marginTop: '4px' }}>Rs.{(loan.principal - loan.paid).toLocaleString()}</h4>
+                </div>
+              </div>
+
+              <div className="cashflow-table-container scrollable-area" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {history.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)' }}>
+                    <Clock size={24} style={{ opacity: 0.5, marginBottom: '8px' }} />
+                    <p style={{ fontWeight: '500', fontSize: '0.85rem' }}>No payments recorded yet.</p>
+                  </div>
+                ) : (
+                  <table className="cashflow-table" style={{ width: '100%', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Source</th>
+                        <th>Type</th>
+                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th style={{ textAlign: 'center' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.slice().reverse().map(payment => {
+                        const isInterest = payment.category === 'Loan Interest' || payment.isInterestOnly;
+                        const account = accounts.find(a => a.id === payment.accountId);
+                        return (
+                          <tr key={payment.id}>
+                            <td>{payment.date}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}>
+                                {account?.type === 'cash' ? <DollarSign size={12} /> : <Landmark size={12} />}
+                                {account?.name || 'Cash'}
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`badge ${isInterest ? 'badge-gold' : 'badge-violet'}`} style={{ fontSize: '0.6rem', padding: '2px 6px' }}>
+                                {isInterest ? 'Interest' : 'Principal'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right', fontWeight: '700', color: isInterest ? 'var(--gold-dark)' : 'var(--slate-dark)' }}>
+                              Rs.{Number(payment.amount).toLocaleString()}
+                            </td>
+                            <td>
+                              <div className="flex-center gap-xs">
+                                <button 
+                                  className="btn-icon-small" 
+                                  onClick={() => setEditingPayment(payment)}
+                                  title="Edit Payment"
+                                >
+                                  <Edit2 size={11} />
+                                </button>
+                                <button 
+                                  className="btn-icon-small danger" 
+                                  onClick={() => {
+                                    if (window.confirm('Delete this payment record?')) {
+                                      deleteTransaction(payment.id);
+                                    }
+                                  }}
+                                  title="Delete Payment"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Loan Payment Editing Modal */}
+      {editingPayment && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content animate-fade-in" style={{ maxWidth: '440px' }}>
+            <div className="flex-between mb-lg">
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>Edit Payment Record</h3>
+                <p className="text-secondary" style={{ fontSize: '0.8rem' }}>Modify transaction details</p>
+              </div>
+              <button 
+                className="btn-ghost" 
+                style={{ padding: '6px', borderRadius: '8px', border: 'none', cursor: 'pointer' }} 
+                onClick={() => setEditingPayment(null)}
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const form = e.target;
+              const date = form.date.value;
+              const amount = Number(form.amount.value);
+              const accountId = form.accountId.value;
+              const isInterestOnly = form.paymentType.value === 'interest';
+              const loan = loans.find(l => 
+                (l.id === editingPayment.loanId) || 
+                (editingPayment.description?.includes(`for ${l.name}`))
+              );
+              
+              if (amount <= 0) return;
+              
+              const updatedPayment = {
+                ...editingPayment,
+                date,
+                amount,
+                accountId,
+                category: isInterestOnly ? 'Loan Interest' : 'Loan Payment',
+                isInterestOnly,
+                description: `${isInterestOnly ? 'Interest payment' : 'Principal payment'} for ${loan ? loan.name : 'loan'}`,
+              };
+              
+              updateTransaction(editingPayment.id, updatedPayment);
+              setEditingPayment(null);
+            }}>
+              <div className="form-group">
+                <label className="form-label">Payment Source</label>
+                <select 
+                  name="accountId" 
+                  className="form-control" 
+                  defaultValue={editingPayment.accountId || 'cash'}
+                  required
+                >
+                  {accounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} (Rs.{Number(acc.balance).toLocaleString()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Payment Type</label>
+                <div className="type-toggle-group">
+                  <label className={`type-toggle-btn ${editingPayment.category === 'Loan Payment' ? 'active expense' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="paymentType" 
+                      value="principal" 
+                      defaultChecked={editingPayment.category === 'Loan Payment'} 
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setEditingPayment({ ...editingPayment, category: 'Loan Payment' });
+                        }
+                      }}
+                    /> 
+                    Principal Payment
+                  </label>
+                  <label className={`type-toggle-btn ${editingPayment.category === 'Loan Interest' ? 'active income' : ''}`}>
+                    <input 
+                      type="radio" 
+                      name="paymentType" 
+                      value="interest" 
+                      defaultChecked={editingPayment.category === 'Loan Interest'} 
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setEditingPayment({ ...editingPayment, category: 'Loan Interest' });
+                        }
+                      }}
+                    /> 
+                    Interest Only
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Payment Amount (Rs.)</label>
+                <input 
+                  type="number" 
+                  name="amount"
+                  className="form-control" 
+                  style={{ fontSize: '1.1rem', fontWeight: '700', textAlign: 'center' }}
+                  defaultValue={editingPayment.amount}
+                  min="1"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Payment Date</label>
+                <input 
+                  type="date" 
+                  name="date"
+                  className="form-control" 
+                  defaultValue={editingPayment.date}
+                  required
+                />
+              </div>
+
+              <div className="flex-center gap-md" style={{ marginTop: '20px' }}>
+                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditingPayment(null)}>Cancel</button>
+                <button type="submit" className="btn btn-success" style={{ flex: 2 }}>
+                  Save Changes
                 </button>
               </div>
             </form>
