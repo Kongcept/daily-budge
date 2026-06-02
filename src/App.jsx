@@ -74,6 +74,7 @@ function App() {
   const [showAddLoanModal, setShowAddLoanModal] = useState(false);
   const [editingLoan, setEditingLoan] = useState(null);
   const [loanFormData, setLoanFormData] = useState({ name: '', principal: '', interest: '', date: getTodayDate(), hasDueDate: false, dueDate: getTodayDate(), type: 'fixed', addToAccount: true, targetAccountId: '' });
+  const [loanPaymentModal, setLoanPaymentModal] = useState(null); // { loan, amount, isInterestOnly, accountId, inputId }
 
   useEffect(() => { if (!isLoading) db.saveTransactions(transactions); }, [transactions, isLoading]);
   useEffect(() => { if (!isLoading) db.saveLoans(loans); }, [loans, isLoading]);
@@ -295,13 +296,14 @@ function App() {
     setEditingLoan(null);
   };
 
-  const recordLoanPayment = (loanId, amount, isInterestOnly = false) => {
+  const recordLoanPayment = (loanId, amount, isInterestOnly = false, accountId = null) => {
     const loan = loans.find(l => l.id === loanId);
     if (!loan) return;
     updateLoan(loanId, { paid: Number(loan.paid) + (isInterestOnly ? 0 : Number(amount)) });
     addTransaction({
       type: 'expense', amount: amount, category: isInterestOnly ? 'Loan Interest' : 'Loan Payment',
-      description: `${isInterestOnly ? 'Interest payment' : 'Principal payment'} for ${loan.name}`, date: getTodayDate()
+      description: `${isInterestOnly ? 'Interest payment' : 'Principal payment'} for ${loan.name}`, date: getTodayDate(),
+      accountId: accountId
     });
     triggerNotification(`${isInterestOnly ? 'Interest' : 'Principal'} payment recorded!`);
   };
@@ -641,14 +643,24 @@ function App() {
                                 <button className="btn btn-success" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => {
                                     const input = document.getElementById(`pay-${loan.id}`);
                                     const amount = Number(input.value);
-                                    if(amount > 0) recordLoanPayment(loan.id, amount, false);
-                                    input.value = '';
+                                    setLoanPaymentModal({
+                                      loan,
+                                      amount: amount > 0 ? amount : (loan.principal - loan.paid),
+                                      isInterestOnly: false,
+                                      accountId: accounts[0]?.id || 'cash',
+                                      inputId: `pay-${loan.id}`
+                                    });
                                   }}>Pay</button>
                                 {isFlexible && <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: '0.7rem' }} onClick={() => {
                                       const input = document.getElementById(`pay-${loan.id}`);
                                       const amount = Number(input.value);
-                                      if(amount > 0) recordLoanPayment(loan.id, amount, true);
-                                      input.value = '';
+                                      setLoanPaymentModal({
+                                        loan,
+                                        amount: amount > 0 ? amount : '',
+                                        isInterestOnly: true,
+                                        accountId: accounts[0]?.id || 'cash',
+                                        inputId: `pay-${loan.id}`
+                                      });
                                     }}>Int</button>}
                               </div>
                               <div style={{ borderLeft: '1px solid var(--border-color)', height: '18px', margin: '0 2px' }}></div>
@@ -718,6 +730,102 @@ function App() {
                 </div>
               )}
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }}>{editingLoan ? 'Update Details' : 'Add Loan'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Loan Payment Modal */}
+      {loanPaymentModal && (
+        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="modal-content animate-fade-in" style={{ maxWidth: '400px' }}>
+            <div className="flex-between mb-lg">
+              <div>
+                <h3 style={{ marginBottom: '4px' }}>
+                  {loanPaymentModal.isInterestOnly ? 'Pay Loan Interest' : 'Record Loan Payment'}
+                </h3>
+                <p className="text-secondary" style={{ fontSize: '0.8rem' }}>{loanPaymentModal.loan.name}</p>
+              </div>
+              <button 
+                className="btn-ghost" 
+                style={{ padding: '6px', borderRadius: '8px', border: 'none', cursor: 'pointer' }} 
+                onClick={() => setLoanPaymentModal(null)}
+              >
+                <X size={20}/>
+              </button>
+            </div>
+
+            {/* Loan Outstanding Balance Card */}
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
+              <div className="flex-between mb-xs">
+                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Loan Principal</span>
+                <span style={{ fontWeight: '700', fontSize: '0.8rem' }}>Rs.{Number(loanPaymentModal.loan.principal).toLocaleString()}</span>
+              </div>
+              <div className="flex-between mb-xs">
+                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Total Paid</span>
+                <span style={{ fontWeight: '700', fontSize: '0.8rem', color: 'var(--accent-success)' }}>Rs.{Number(loanPaymentModal.loan.paid).toLocaleString()}</span>
+              </div>
+              <div className="flex-between">
+                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>Outstanding Principal</span>
+                <span style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--accent-danger)' }}>
+                  Rs.{(Number(loanPaymentModal.loan.principal) - Number(loanPaymentModal.loan.paid)).toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const { loan, amount, isInterestOnly, accountId, inputId } = loanPaymentModal;
+              const paidAmt = Number(amount);
+              if (paidAmt <= 0) return;
+              
+              recordLoanPayment(loan.id, paidAmt, isInterestOnly, accountId);
+              
+              // Clear the input element if it exists in the DOM
+              if (inputId) {
+                const inputEl = document.getElementById(inputId);
+                if (inputEl) inputEl.value = '';
+              }
+              
+              setLoanPaymentModal(null);
+            }}>
+              <div className="form-group">
+                <label className="form-label">Payment Source</label>
+                <div className="category-chips" style={{ gap: '6px' }}>
+                  {accounts.map(acc => (
+                    <button 
+                      key={acc.id} 
+                      type="button" 
+                      className={`chip ${loanPaymentModal.accountId === acc.id ? 'active' : ''}`} 
+                      onClick={() => setLoanPaymentModal({...loanPaymentModal, accountId: acc.id})}
+                    >
+                      {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '4px' }} /> : <Landmark size={12} style={{ marginRight: '4px' }} />}
+                      {acc.name} (Rs.{Number(acc.balance).toLocaleString()})
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Payment Amount (Rs.)</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  style={{ fontSize: '1.1rem', fontWeight: '700', textAlign: 'center' }}
+                  value={loanPaymentModal.amount}
+                  onChange={e => setLoanPaymentModal({ ...loanPaymentModal, amount: e.target.value })}
+                  min="1"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex-center gap-md" style={{ marginTop: '16px' }}>
+                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setLoanPaymentModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-success" style={{ flex: 2 }}>
+                  <Check size={16} /> Confirm Payment
+                </button>
+              </div>
             </form>
           </div>
         </div>
