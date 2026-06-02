@@ -1123,7 +1123,7 @@ function App() {
               const form = e.target;
               const date = form.date.value;
               const amount = Number(form.amount.value);
-              const accountId = form.accountId.value;
+              const accountId = editingPayment.accountId || 'cash';
               const isInterestOnly = form.paymentType.value === 'interest';
               const loan = loans.find(l => 
                 (l.id === editingPayment.loanId) || 
@@ -1147,18 +1147,19 @@ function App() {
             }}>
               <div className="form-group">
                 <label className="form-label">Payment Source</label>
-                <select 
-                  name="accountId" 
-                  className="form-control" 
-                  defaultValue={editingPayment.accountId || 'cash'}
-                  required
-                >
+                <div className="category-chips" style={{ gap: '6px' }}>
                   {accounts.map(acc => (
-                    <option key={acc.id} value={acc.id}>
+                    <button 
+                      key={acc.id} 
+                      type="button" 
+                      className={`chip ${editingPayment.accountId === acc.id ? 'active' : ''}`} 
+                      onClick={() => setEditingPayment({...editingPayment, accountId: acc.id})}
+                    >
+                      {acc.type === 'cash' ? <DollarSign size={12} style={{ marginRight: '4px' }} /> : <Landmark size={12} style={{ marginRight: '4px' }} />}
                       {acc.name} (Rs.{Number(acc.balance).toLocaleString()})
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
               <div className="form-group">
